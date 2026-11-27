@@ -686,6 +686,16 @@ body {
   font-size: 0.93rem;
 }
 
+.contact-link {
+  color: var(--cyan);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.contact-link:hover {
+  text-decoration: underline;
+}
+
 /* Footer */
 .site-footer {
   padding: 22px 0;
