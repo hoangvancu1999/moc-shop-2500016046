@@ -1,3 +1,24 @@
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  serverTimestamp
+} from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
+
+// Cấu hình Firebase Web App của project moc-shop-2500016046
+const firebaseConfig = {
+  apiKey: "AIzaSyC06R-hiKFBGlhTWgX18O47ynSMd48Kmf8",
+  authDomain: "moc-shop-2500016046.firebaseapp.com",
+  projectId: "moc-shop-2500016046",
+  storageBucket: "moc-shop-2500016046.firebasestorage.app",
+  messagingSenderId: "101789182203",
+  appId: "1:101789182203:web:8aac24a540218ad9fde85e"
+};
+
+const firebaseApp = initializeApp(firebaseConfig);
+const db = getFirestore(firebaseApp);
+
 const CART_KEY = "hcugaming_cart";
 
 let activeGame = "all";
@@ -360,12 +381,16 @@ function closeCart() {
   document.getElementById("cart-drawer").hidden = true;
 }
 
-function handleOrderSubmit(e) {
+async function handleOrderSubmit(e) {
   e.preventDefault();
   const name = document.getElementById("buyer-name").value.trim();
   const contact = document.getElementById("buyer-contact").value.trim();
+  const ingame = document.getElementById("buyer-ingame").value.trim();
+  const payment = document.getElementById("buyer-payment").value;
+  const note = document.getElementById("buyer-note").value.trim();
   const consent = document.getElementById("buyer-consent").checked;
   const errEl = document.getElementById("order-error");
+  const submitBtn = document.getElementById("submit-order-btn");
 
   let errMsg = "";
   const cleanPhone = contact.replace(/[\s.-]/g, "");
@@ -387,15 +412,65 @@ function handleOrderSubmit(e) {
 
   errEl.hidden = true;
   const code = `HCU-${Math.floor(100000 + Math.random() * 900000)}`;
-  document.getElementById("order-code").textContent = code;
 
-  cart = [];
-  saveCart();
-  renderCart();
+  const orderItems = [];
+  let totalQty = 0;
+  let grandTotal = 0;
 
-  document.getElementById("order-form").reset();
-  document.getElementById("cart-empty").hidden = true;
-  document.getElementById("order-success").hidden = false;
+  cart.forEach((entry) => {
+    const item = findCatalogItem(entry.id);
+    if (!item) return;
+    const lineTotal = item.price * entry.qty;
+    totalQty += entry.qty;
+    grandTotal += lineTotal;
+    orderItems.push({
+      id: item.id,
+      title: item.title,
+      type: item.type,
+      price: item.price,
+      qty: entry.qty,
+      lineTotal
+    });
+  });
+
+  const originalBtnText = submitBtn.textContent;
+  submitBtn.disabled = true;
+  submitBtn.textContent = "Đang gửi đơn hàng...";
+
+  try {
+    await addDoc(collection(db, "donhang"), {
+      maDon: code,
+      tenKhach: name,
+      soDienThoai: contact,
+      ingame,
+      hinhThucThanhToan: payment,
+      ghiChu: note,
+      danhSachMon: orderItems,
+      soMon: totalQty,
+      tamTinh: grandTotal,
+      tongTien: grandTotal,
+      thoiGian: serverTimestamp(),
+      ngayTaoISO: new Date().toISOString()
+    });
+
+    document.getElementById("order-code").textContent = code;
+
+    cart = [];
+    saveCart();
+    renderCart();
+
+    document.getElementById("order-form").reset();
+    document.getElementById("cart-empty").hidden = true;
+    document.getElementById("order-success").hidden = false;
+  } catch (err) {
+    console.error("Lỗi ghi đơn hàng lên Firestore:", err);
+    errEl.textContent =
+      "Không thể lưu đơn hàng lên hệ thống lúc này. Vui lòng kiểm tra mạng và thử lại (hoặc nhắn Zalo 0911507170).";
+    errEl.hidden = false;
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = originalBtnText;
+  }
 }
 
 document.addEventListener("DOMContentLoaded", () => {
