@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Game Cùng Delta Force – Tìm Đồng Đội Và Đặt Lịch Chơi</title>
+  <meta
+    name="description"
+    content="Đặt lịch chơi Delta Force cùng đồng đội qua Discord. Trải nghiệm Operations, Warfare, khám phá bản đồ và phối hợp tổ đội."
+  />
+  <link rel="canonical" href="https://moc-shop-2500016046.vercel.app/game-cung" />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Game Cùng Delta Force – Tìm Đồng Đội Và Đặt Lịch Chơi" />
+  <meta
+    property="og:description"
+    content="Không chỉ chơi game, mà còn có đồng đội. Đặt lịch chơi Delta Force cùng người đồng hành qua Discord."
+  />
+  <meta property="og:url" content="https://moc-shop-2500016046.vercel.app/game-cung" />
+  <link rel="stylesheet" href="/css/game-cung.css" />
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Service",
+      "name": "GAME CÙNG – PLAY TOGETHER (Delta Force)",
+      "slogan": "Không chỉ chơi game, mà còn có đồng đội.",
+      "description": "Đặt lịch chơi Delta Force cùng đồng đội qua Discord. Trải nghiệm Operations, Warfare, khám phá bản đồ và phối hợp tổ đội.",
+      "provider": {
+        "@type": "Organization",
+        "name": "HcuGaming"
+      },
+      "areaServed": "VN"
+    }
+  </script>
+</head>
+<body>
+  <div class="tac-topbar">
+    GAME CÙNG – PLAY TOGETHER • Đồng hành qua Discord • Tự cầm tài khoản 100% – Không thu mật khẩu/OTP
+  </div>
+
+  <header class="tac-header">
+    <div class="container tac-header-inner">
+      <a href="/" class="tac-brand" aria-label="Về trang chủ HcuGaming">
+        <span class="tac-brand-mark">HG</span>
+        <span>Hcu<span class="accent">Gaming</span></span>
+      </a>
+
+      <nav class="tac-nav" aria-label="Điều hướng trang Game Cùng">
+        <a href="/">Trang chủ Shop</a>
+        <a href="#bang-gia" class="active">Bảng giá Game Cùng</a>
+        <a href="#dat-lich">Đặt lịch</a>
+        <a href="#discord">Discord</a>
+        <a href="#danh-gia">Đánh giá</a>
+        <a href="#quy-tac">Quy tắc</a>
+      </nav>
+
+      <a href="/admin" class="btn btn-outline btn-sm">Quản trị</a>
+    </div>
+  </header>
+
+  <main>
+    <!-- 1. HERO -->
+    <section class="gc-hero">
+      <div class="container gc-hero-grid">
+        <div>
+          <span class="tac-kicker">GAME CÙNG – PLAY TOGETHER</span>
+          <h1>GAME CÙNG DELTA FORCE</h1>
+          <p class="gc-tagline">"Không chỉ chơi game, mà còn có đồng đội."</p>
+          <p class="gc-hero-desc">
+            Bạn muốn tìm đồng đội để khám phá bản đồ, tham gia Operations, chiến đấu trong Warfare hay đơn giản là có người chơi cùng? Hãy đặt lịch và tham gia trận đấu cùng chúng tôi.
+          </p>
+          <div class="gc-hero-actions">
+            <a href="#dat-lich" class="btn btn-primary">Đặt lịch chơi ngay</a>
+            <a href="#bang-gia" class="btn btn-outline">Xem bảng giá</a>
+          </div>
+        </div>
+
+        <!-- Hình minh họa tổ đội phối hợp tactical bản quyền sạch -->
+        <div class="tac-squad-visual">
+          <svg class="tac-squad-svg" viewBox="0 0 540 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Minh họa tổ đội phối hợp chiến thuật trong Delta Force">
+            <defs>
+              <linearGradient id="bgGrad" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#091322" />
+                <stop offset="100%" stop-color="#132338" />
+              </linearGradient>
+              <linearGradient id="hudGreen" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="#10b981" />
+                <stop offset="100%" stop-color="#06b6d4" />
+              </linearGradient>
+            </defs>
+            <rect width="540" height="320" rx="10" fill="url(#bgGrad)" />
+            <!-- Lưới chiến thuật -->
+            <g stroke="#1c2f4a" stroke-width="1" opacity="0.65">
+              <line x1="0" y1="64" x2="540" y2="64" />
+              <line x1="0" y1="128" x2="540" y2="128" />
+              <line x1="0" y1="192" x2="540" y2="192" />
+              <line x1="0" y1="256" x2="540" y2="256" />
+              <line x1="108" y1="0" x2="108" y2="320" />
+              <line x1="216" y1="0" x2="216" y2="320" />
+              <line x1="324" y1="0" x2="324" y2="320" />
+              <line x1="432" y1="0" x2="432" y2="320" />
+            </g>
+            <!-- Vòng radar chiến thuật -->
+            <circle cx="270" cy="165" r="105" fill="none" stroke="#10b981" stroke-opacity="0.28" stroke-dasharray="6 4" />
+            <circle cx="270" cy="165" r="65" fill="none" stroke="#06b6d4" stroke-opacity="0.35" />
+            <!-- Đường kết nối tổ đội 3 người -->
+            <polygon points="165,205 270,105 375,205" fill="rgba(16,185,129,0.09)" stroke="url(#hudGreen)" stroke-width="2" />
+            <!-- Operator 1 (Leader / Companion) -->
+            <g transform="translate(242,72)">
+              <rect width="56" height="56" rx="12" fill="#0f2926" stroke="#10b981" stroke-width="2" />
+              <circle cx="28" cy="22" r="9" fill="#10b981" />
+              <path d="M14 44 C14 34, 42 34, 42 44" fill="#10b981" />
+              <text x="28" y="72" text-anchor="middle" fill="#edf2fb" font-size="11" font-weight="bold">COMPANION</text>
+            </g>
+            <!-- Operator 2 (Player A) -->
+            <g transform="translate(137,175)">
+              <rect width="56" height="56" rx="12" fill="#102235" stroke="#06b6d4" stroke-width="2" />
+              <circle cx="28" cy="22" r="9" fill="#06b6d4" />
+              <path d="M14 44 C14 34, 42 34, 42 44" fill="#06b6d4" />
+              <text x="28" y="72" text-anchor="middle" fill="#edf2fb" font-size="11" font-weight="bold">YOU (SQUAD 1)</text>
+            </g>
+            <!-- Operator 3 (Player B) -->
+            <g transform="translate(347,175)">
+              <rect width="56" height="56" rx="12" fill="#292110" stroke="#f59e0b" stroke-width="2" />
+              <circle cx="28" cy="22" r="9" fill="#f59e0b" />
+              <path d="M14 44 C14 34, 42 34, 42 44" fill="#f59e0b" />
+              <text x="28" y="72" text-anchor="middle" fill="#edf2fb" font-size="11" font-weight="bold">TEAMMATE</text>
+            </g>
+            <!-- HUD Top Tag -->
+            <rect x="16" y="16" width="176" height="26" rx="6" fill="rgba(7,10,15,0.8)" stroke="#223049" />
+            <circle cx="30" cy="29" r="4" fill="#10b981" />
+            <text x="42" y="33" fill="#90a1be" font-size="11" font-family="monospace">DISCORD VOICE: ACTIVE</text>
+          </svg>
+          <div class="tac-squad-caption">
+            <span>🎯 Chế độ: Operations • Warfare • Detonation</span>
+            <span>🎙️ Kết nối Voice Discord</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. PHÂN BIỆT RÕ GAME CÙNG VÀ COACHING -->
+    <section class="tac-section tac-section-alt">
+      <div class="container">
+        <div class="sec-header">
+          <h2>Phân Biệt Dịch Vụ: Game Cùng &amp; Coaching</h2>
+          <p>Chọn đúng hình thức phù hợp với mục tiêu trải nghiệm của bạn.</p>
+        </div>
+
+        <div class="compare-grid">
+          <article class="compare-card highlight">
+            <h3>🎮 GAME CÙNG – PLAY TOGETHER <span class="status-pill status-completed">Trang hiện tại</span></h3>
+            <ul class="compare-list">
+              <li>Tập trung vào trải nghiệm có đồng đội đi cùng, giao lưu vui vẻ, phối hợp callout nhịp nhàng.</li>
+              <li>Cùng khám phá bản đồ Operations, giữ mục tiêu Warfare hoặc phối hợp tổ đội Squad.</li>
+              <li>Khách hàng tự cầm tài khoản của mình, không áp lực bài tập hay giáo trình nặng.</li>
+              <li>Không cam kết thắng trận hay loot hiếm – đề cao tinh thần đồng đội văn minh.</li>
+            </ul>
+          </article>
+
+          <article class="compare-card">
+            <h3>📋 COACHING / HƯỚNG DẪN KỸ NĂNG</h3>
+            <ul class="compare-list">
+              <li>Tập trung phân tích lỗi cá nhân (di chuyển, tâm ngắm, quản lý kinh tế, cấu hình Gunsmith).</li>
+              <li>Đi theo lộ trình huấn luyện từng bản đồ/Operator cụ thể để cải thiện kỹ năng thực chiến.</li>
+              <li>Có đánh giá sau buổi tập và checklist cải thiện cá nhân.</li>
+              <li>Nếu bạn cần dịch vụ khác tại cửa hàng, xem thêm tại <a href="/#dich-vu" style="color: var(--tac-cyan);">mục Dịch vụ trang chủ</a>.</li>
+            </ul>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3 & 4. BẢNG GIÁ GÓI DỊCH VỤ & BỘ LỌC 6 TIÊU CHÍ -->
+    <section id="bang-gia" class="tac-section">
+      <div class="container">
+        <div class="sec-header">
+          <h2>Bảng Giá &amp; Chọn Gói Game Cùng</h2>
+          <p>Kết hợp bộ lọc bên dưới để tìm gói phù hợp và kiểm tra nhanh khung giờ bạn muốn chơi.</p>
+        </div>
+
+        <div class="filter-panel" aria-label="Bộ lọc dịch vụ Game Cùng">
+          <div class="field">
+            <label for="f-mode">Chế độ chơi</label>
+            <select id="f-mode">
+              <option value="all">Tất cả chế độ</option>
+              <option value="Operations">Operations</option>
+              <option value="Warfare">Warfare</option>
+              <option value="Detonation">Detonation</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="f-map">Bản đồ đang hoạt động</label>
+            <select id="f-map">
+              <option value="all">Tất cả bản đồ</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="f-duration">Thời lượng</label>
+            <select id="f-duration">
+              <option value="all">Mọi thời lượng</option>
+              <option value="30">30 phút</option>
+              <option value="60">60 phút</option>
+              <option value="90">90 phút</option>
+              <option value="120">120 phút</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="f-format">Hình thức</label>
+            <select id="f-format">
+              <option value="all">Mọi hình thức</option>
+              <option value="Solo cùng người đồng hành">Solo cùng người đồng hành</option>
+              <option value="Duo">Duo</option>
+              <option value="Squad">Squad</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="f-level">Trình độ</label>
+            <select id="f-level">
+              <option value="all">Tất cả trình độ</option>
+              <option value="Mới bắt đầu">Mới bắt đầu</option>
+              <option value="Cơ bản">Cơ bản</option>
+              <option value="Trung cấp">Trung cấp</option>
+              <option value="Nâng cao">Nâng cao</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="f-date">Ngày dự kiến</label>
+            <input type="date" id="f-date" />
+          </div>
+
+          <div class="field">
+            <label for="f-time">Khung giờ</label>
+            <select id="f-time">
+              <option value="">Chọn giờ...</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <button type="button" id="reset-filters-btn" class="btn btn-outline">Xóa bộ lọc</button>
+          </div>
+        </div>
+
+        <div id="filter-slot-banner" class="slot-status-box" style="margin-bottom: 20px;" hidden></div>
+
+        <div id="package-grid" class="pkg-grid" aria-live="polite"></div>
+        <p id="package-empty" class="slot-status-box" hidden>
+          Không có gói dịch vụ nào khớp tất cả bộ lọc đang chọn. Hãy bấm "Xóa bộ lọc" hoặc chọn gói "Buổi chơi tùy chỉnh".
+        </p>
+      </div>
+    </section>
+
+    <!-- 5 & 6. HỆ THỐNG ĐẶT LỊCH & TRA CỨU TRẠNG THÁI -->
+    <section id="dat-lich" class="tac-section tac-section-alt">
+      <div class="container">
+        <div class="sec-header">
+          <h2>Đặt Lịch Chơi Cùng &amp; Kiểm Tra Lịch Trống</h2>
+          <p>Đơn đặt lịch mới sẽ ở trạng thái <strong>Chờ xác nhận (Pending)</strong> cho đến khi Admin kiểm tra lịch trống và xác nhận.</p>
+        </div>
+
+        <div class="booking-layout">
+          <!-- Form đặt lịch -->
+          <div class="panel-card">
+            <form id="booking-form" class="form-stack" novalidate>
+              <div class="form-grid-2">
+                <div class="field">
+                  <label for="b-name">Họ và tên hoặc biệt danh <span class="req">*</span></label>
+                  <input type="text" id="b-name" placeholder="Ví dụ: Hoàng Quân" required />
+                </div>
+
+                <div class="field">
+                  <label for="b-discord">Discord ID (Bảo mật, không công khai) <span class="req">*</span></label>
+                  <input type="text" id="b-discord" placeholder="Ví dụ: quan_df hoặc Quan#1234" required />
+                </div>
+              </div>
+
+              <div class="form-grid-2">
+                <div class="field">
+                  <label for="b-gameid">Game ID / Tên nhân vật Delta Force</label>
+                  <input type="text" id="b-gameid" placeholder="Tùy chọn – có thể gửi sau trên Discord" />
+                </div>
+
+                <div class="field">
+                  <label for="b-package">Gói dịch vụ <span class="req">*</span></label>
+                  <select id="b-package" required></select>
+                </div>
+              </div>
+
+              <div class="form-grid-2">
+                <div class="field">
+                  <label for="b-mode">Chế độ chơi <span class="req">*</span></label>
+                  <select id="b-mode" required>
+                    <option value="Operations">Operations</option>
+                    <option value="Warfare">Warfare</option>
+                    <option value="Detonation">Detonation</option>
+                  </select>
+                </div>
+
+                <div class="field">
+                  <label for="b-map">Bản đồ mong muốn <span class="req">*</span></label>
+                  <select id="b-map" required></select>
+                </div>
+              </div>
+
+              <div class="form-grid-2">
+                <div class="field">
+                  <label for="b-date">Ngày chơi <span class="req">*</span></label>
+                  <input type="date" id="b-date" required />
+                </div>
+
+                <div class="field">
+                  <label for="b-time">Giờ bắt đầu <span class="req">*</span></label>
+                  <select id="b-time" required></select>
+                </div>
+              </div>
+
+              <div class="form-grid-2">
+                <div class="field">
+                  <label for="b-duration">Thời lượng <span class="req">*</span></label>
+                  <select id="b-duration" required>
+                    <option value="30">30 phút</option>
+                    <option value="60" selected>60 phút</option>
+                    <option value="90">90 phút</option>
+                    <option value="120">120 phút</option>
+                  </select>
+                </div>
+
+                <div class="field">
+                  <label for="b-format">Hình thức &amp; Trình độ</label>
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                    <select id="b-format" aria-label="Hình thức tổ đội">
+                      <option value="Solo cùng người đồng hành">Solo 1-1</option>
+                      <option value="Duo">Duo</option>
+                      <option value="Squad">Squad</option>
+                    </select>
+                    <select id="b-level" aria-label="Trình độ người chơi">
+                      <option value="Mới bắt đầu">Mới bắt đầu</option>
+                      <option value="Cơ bản">Cơ bản</option>
+                      <option value="Trung cấp">Trung cấp</option>
+                      <option value="Nâng cao">Nâng cao</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Kết quả kiểm tra lịch trống tự động (Bước 4) -->
+              <div id="booking-slot-check" class="slot-status-box">
+                Đang kiểm tra lịch trống cho khung giờ bạn chọn...
+              </div>
+
+              <div class="field">
+                <label for="b-note">Ghi chú cho người đồng hành</label>
+                <textarea id="b-note" rows="2" placeholder="Ví dụ: Mình mới chơi muốn làm quen map Zero Dam, có dùng mic Discord."></textarea>
+              </div>
+
+              <label style="display: flex; gap: 8px; align-items: flex-start; font-size: 0.86rem; color: var(--text-muted); cursor: pointer;">
+                <input type="checkbox" id="b-rule-consent" style="margin-top: 4px;" required />
+                <span>
+                  Tôi đã đọc Quy tắc hoạt động: tự đăng nhập và điều khiển tài khoản của mình, không cung cấp mật khẩu/OTP, không dùng phần mềm gian lận và hiểu rằng đơn cần Admin xác nhận lịch trống. <span class="req">*</span>
+                </span>
+              </label>
+
+              <div id="booking-error" class="alert-msg alert-error" hidden></div>
+              <div id="booking-success" class="alert-msg alert-success" hidden></div>
+
+              <button type="submit" id="submit-booking-btn" class="btn btn-primary btn-full">
+                Kiểm tra lịch &amp; Gửi yêu cầu đặt lịch
+              </button>
+            </form>
+          </div>
+
+          <!-- Cột phải: Quy trình 9 bước & Tra cứu đơn -->
+          <div class="form-stack">
+            <div class="panel-card">
+              <h3>Tra cứu trạng thái lịch đặt &amp; Đánh giá</h3>
+              <p style="font-size: 0.88rem; color: var(--text-muted); margin: 6px 0 12px;">
+                Nhập mã đơn đặt lịch (ví dụ: <code>GC-123456</code>) để xem trạng thái xác nhận hoặc gửi đánh giá sau khi buổi chơi hoàn thành.
+              </p>
+              <div style="display: flex; gap: 8px;">
+                <input
+                  type="text"
+                  id="lookup-code-input"
+                  placeholder="Nhập mã GC-XXXXXX"
+                  style="flex: 1; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 9px 11px;"
+                />
+                <button type="button" id="lookup-btn" class="btn btn-primary btn-sm">Tra cứu</button>
+              </div>
+              <div id="lookup-result" style="margin-top: 14px;" hidden></div>
+            </div>
+
+            <div class="panel-card">
+              <h3>Quy trình 9 bước chuẩn</h3>
+              <ol class="workflow-steps">
+                <li><span class="step-num">1</span><span>Khách chọn gói dịch vụ phù hợp.</span></li>
+                <li><span class="step-num">2</span><span>Khách chọn ngày &amp; khung giờ mong muốn.</span></li>
+                <li><span class="step-num">3</span><span>Điền thông tin liên hệ (Discord ID được mã hóa bảo mật).</span></li>
+                <li><span class="step-num">4</span><span>Hệ thống tự động kiểm tra lịch trống thực tế.</span></li>
+                <li><span class="step-num">5</span><span>Khách gửi yêu cầu (trạng thái khởi tạo: <strong>Pending – Chờ xác nhận</strong>).</span></li>
+                <li><span class="step-num">6</span><span>Admin nhận thông báo đơn mới trong trang Quản trị.</span></li>
+                <li><span class="step-num">7</span><span>Admin kiểm tra &amp; xác nhận lịch (Confirmed).</span></li>
+                <li><span class="step-num">8</span><span>Khách tham gia Discord nhận phòng Voice đồng hành.</span></li>
+                <li><span class="step-num">9</span><span>Sau khi hoàn thành (Completed), khách mở khóa quyền đánh giá 1–5 sao.</span></li>
+              </ol>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 7. TÍCH HỢP DISCORD -->
+    <section id="discord" class="tac-section">
+      <div class="container">
+        <div class="sec-header">
+          <h2>Kết Nối Discord Đồng Hành</h2>
+          <p>Mọi buổi chơi đều kết nối qua máy chủ Discord chính thức. Chúng tôi bảo mật tuyệt đối Discord ID của khách hàng.</p>
+        </div>
+
+        <div class="panel-card" style="margin-bottom: 20px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 16px;">
+          <div>
+            <h3>Tham gia máy chủ Discord HcuGaming</h3>
+            <p style="color: var(--text-muted); font-size: 0.92rem; margin-top: 4px;">
+              Sau khi đặt lịch và nhận mã <code>GC-XXXXXX</code>, hãy vào Discord và gửi mã đơn tại kênh hỗ trợ để nhận role phòng Voice riêng.
+            </p>
+          </div>
+          <a id="discord-join-link" href="https://discord.gg/hcugaming" target="_blank" rel="noopener noreferrer" class="btn btn-primary">
+            🎙️ Tham gia Discord ngay
+          </a>
+        </div>
+
+        <div class="discord-grid">
+          <article class="channel-box">
+            <div class="channel-tag">#xac-nhan-lich-hen</div>
+            <h4>Hướng dẫn xác nhận lịch</h4>
+            <p style="font-size: 0.88rem; color: var(--text-muted); margin-top: 4px;">
+              Mở ticket riêng tư kèm mã đơn <code>GC-XXXXXX</code> (không dán thông tin cá nhân ra kênh chat chung). Admin xác nhận và cấp quyền vào Voice Room trước giờ chơi 10 phút.
+            </p>
+          </article>
+
+          <article class="channel-box">
+            <div class="channel-tag">#thong-bao-lich-choi</div>
+            <h4>Kênh thông báo lịch chơi</h4>
+            <p style="font-size: 0.88rem; color: var(--text-muted); margin-top: 4px;">
+              Cập nhật các khung giờ trống trong ngày, lịch mở map xoay tua Operations (Space City / Tide Prison) và thông báo trạng thái ca chơi theo mã đơn ẩn danh.
+            </p>
+          </article>
+
+          <article class="channel-box">
+            <div class="channel-tag">#ho-tro-khach-hang</div>
+            <h4>Kênh hỗ trợ khách hàng</h4>
+            <p style="font-size: 0.88rem; color: var(--text-muted); margin-top: 4px;">
+              Hỗ trợ đổi khung giờ trước buổi chơi, giải đáp thắc mắc kết nối mic trong game/Discord hoặc liên hệ nhanh Zalo <strong>0911507170</strong>.
+            </p>
+          </article>
+
+          <article class="channel-box">
+            <div class="channel-tag">#danh-gia-dich-vu</div>
+            <h4>Kênh đánh giá dịch vụ</h4>
+            <p style="font-size: 0.88rem; color: var(--text-muted); margin-top: 4px;">
+              Nơi lưu trữ phản hồi thực tế từ các buổi đồng hành đã hoàn thành và tiếp nhận góp ý nâng cao chất lượng đồng đội.
+            </p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- 8. ĐÁNH GIÁ DỊCH VỤ ĐÃ XÁC THỰC -->
+    <section id="danh-gia" class="tac-section tac-section-alt">
+      <div class="container">
+        <div class="sec-header">
+          <h2>Đánh Giá Thực Tế Từ Đơn Hàng Hoàn Thành</h2>
+          <p>Chỉ những mã đơn đã hoàn thành buổi chơi (trạng thái <strong>Completed</strong>) mới có thể gửi đánh giá lên hệ thống.</p>
+        </div>
+
+        <!-- Form đánh giá (chỉ mở khi tra cứu đơn Completed hoặc nhập mã đơn Completed) -->
+        <div id="review-form-card" class="panel-card" style="margin-bottom: 24px;" hidden>
+          <h3>Gửi đánh giá cho đơn hoàn thành: <span id="review-order-label" style="color: var(--tac-green);"></span></h3>
+          <form id="review-form" class="form-stack" style="margin-top: 12px;">
+            <input type="hidden" id="r-booking-code" />
+
+            <div class="field">
+              <label for="r-display-name">Tên hiển thị ẩn danh (chỉ hiện chữ cái đầu, không lộ Discord ID)</label>
+              <input type="text" id="r-display-name" placeholder="Ví dụ: Minh Quân" required />
+            </div>
+
+            <div class="form-grid-2">
+              <div class="rating-row">
+                <span>Chất lượng đồng hành</span>
+                <select id="r-companion">
+                  <option value="5">5 ★ - Xuất sắc</option>
+                  <option value="4">4 ★ - Tốt</option>
+                  <option value="3">3 ★ - Ổn</option>
+                  <option value="2">2 ★ - Chưa tốt</option>
+                  <option value="1">1 ★ - Kém</option>
+                </select>
+              </div>
+              <div class="rating-row">
+                <span>Giao tiếp</span>
+                <select id="r-comm">
+                  <option value="5">5 ★ - Xuất sắc</option>
+                  <option value="4">4 ★ - Tốt</option>
+                  <option value="3">3 ★ - Ổn</option>
+                  <option value="2">2 ★ - Chưa tốt</option>
+                  <option value="1">1 ★ - Kém</option>
+                </select>
+              </div>
+              <div class="rating-row">
+                <span>Thái độ</span>
+                <select id="r-attitude">
+                  <option value="5">5 ★ - Xuất sắc</option>
+                  <option value="4">4 ★ - Tốt</option>
+                  <option value="3">3 ★ - Ổn</option>
+                  <option value="2">2 ★ - Chưa tốt</option>
+                  <option value="1">1 ★ - Kém</option>
+                </select>
+              </div>
+              <div class="rating-row">
+                <span>Đúng giờ</span>
+                <select id="r-punctual">
+                  <option value="5">5 ★ - Xuất sắc</option>
+                  <option value="4">4 ★ - Tốt</option>
+                  <option value="3">3 ★ - Ổn</option>
+                  <option value="2">2 ★ - Chưa tốt</option>
+                  <option value="1">1 ★ - Kém</option>
+                </select>
+              </div>
+              <div class="rating-row">
+                <span>Mức độ hài lòng chung</span>
+                <select id="r-satisfaction">
+                  <option value="5">5 ★ - Xuất sắc</option>
+                  <option value="4">4 ★ - Tốt</option>
+                  <option value="3">3 ★ - Ổn</option>
+                  <option value="2">2 ★ - Chưa tốt</option>
+                  <option value="1">1 ★ - Kém</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="r-comment">Nhận xét buổi chơi <span class="req">*</span></label>
+              <textarea id="r-comment" rows="2" placeholder="Chia sẻ trải nghiệm đồng hành của bạn..." required></textarea>
+            </div>
+
+            <div id="review-msg" class="alert-msg" hidden></div>
+            <button type="submit" id="submit-review-btn" class="btn btn-primary">Gửi đánh giá xác thực</button>
+          </form>
+        </div>
+
+        <div id="reviews-list" class="reviews-grid"></div>
+        <p id="reviews-empty" class="slot-status-box">
+          Chưa có đánh giá công khai nào. Nếu bạn vừa hoàn thành buổi chơi (trạng thái Completed), hãy nhập mã đơn tại ô "Tra cứu trạng thái lịch đặt" phía trên để mở form đánh giá!
+        </p>
+      </div>
+    </section>
+
+    <!-- 11. QUY TẮC HOẠT ĐỘNG -->
+    <section id="quy-tac" class="tac-section">
+      <div class="container">
+        <div class="sec-header">
+          <h2>Quy Tắc Hoạt Động &amp; Minh Bạch Dịch Vụ</h2>
+          <p>Cam kết tuân thủ trải nghiệm chơi game lành mạnh và an toàn thông tin tài khoản.</p>
+        </div>
+
+        <div class="rules-grid">
+          <article class="panel-card">
+            <h4>🔒 An toàn tài khoản tuyệt đối</h4>
+            <p style="font-size: 0.9rem; color: var(--text-muted); margin-top: 6px;">
+              Đây là dịch vụ chơi cùng khách hàng, không phải dịch vụ mua bán tài khoản tại trang này. Chúng tôi <strong>tuyệt đối không bao giờ yêu cầu mật khẩu hay mã OTP</strong>. Khách hàng tự đăng nhập và trực tiếp điều khiển tài khoản của mình.
+            </p>
+          </article>
+
+          <article class="panel-card">
+            <h4>🛡️ Không gian lận – Không cày thuê</h4>
+            <p style="font-size: 0.9rem; color: var(--text-muted); margin-top: 6px;">
+              Nghiêm cấm mọi phần mềm gian lận (hack/cheat/macro). Không thực hiện hành vi boosting, cày thuê hay giao dịch vật phẩm trái điều khoản nhà phát hành; không cam kết tỉ lệ thắng trận, loot hiếm hay lợi nhuận trong game.
+            </p>
+          </article>
+
+          <article class="panel-card">
+            <h4>⚖️ Lưu ý điều khoản thương mại</h4>
+            <p style="font-size: 0.9rem; color: var(--text-muted); margin-top: 6px;">
+              Dịch vụ tính phí dựa trên thời gian kết nối giao lưu và đồng hành qua Discord. Quản trị viên cần kiểm tra điều khoản dịch vụ của trò chơi và quy định thương mại hiện hành trước khi vận hành thu phí.
+            </p>
+          </article>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="tac-footer">
+    <div class="container tac-footer-inner">
+      <span>© 2026 HcuGaming – GAME CÙNG DELTA FORCE ("Không chỉ chơi game, mà còn có đồng đội.")</span>
+      <span>Zalo hỗ trợ: 0911507170 • Quận 12, TP. Hồ Chí Minh</span>
+    </div>
+  </footer>
+
+  <script type="module" src="/js/game-cung.js"></script>
+</body>
+</html>

@@ -1,9 +1,103 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    function isAdminAuth() {
+      return request.auth != null && request.auth.token.email == "hoangvancu1999@gmail.com";
+    }
+
+    function isAdminWrite() {
+      return isAdminAuth() || (
+        request.resource.data._adminToken is string &&
+        request.resource.data._adminToken.size() >= 32 &&
+        exists(/databases/$(database)/documents/gc_admin_sessions/$(request.resource.data._adminToken))
+      );
+    }
+
+    // Collection đơn hàng cửa hàng hiện tại (giữ nguyên 100%)
     match /donhang/{orderId} {
       allow create: if true;
       allow read, update, delete: if false;
+    }
+
+    // Khóa xác thực Admin (cấm đọc công khai tuyệt đối)
+    match /gc_secrets/admin {
+      allow create: if !exists(/databases/$(database)/documents/gc_secrets/admin) &&
+                    request.resource.data.keyHash is string &&
+                    request.resource.data.keyHash.size() == 64;
+      allow update: if isAdminWrite() &&
+                    request.resource.data.keyHash is string &&
+                    request.resource.data.keyHash.size() == 64;
+      allow read, delete: if false;
+    }
+
+    // Khóa công khai RSA-OAEP mã hóa PII khách hàng & khóa bí mật bọc AES-GCM
+    match /gc_secrets/vault {
+      allow get: if true;
+      allow create: if !exists(/databases/$(database)/documents/gc_secrets/vault);
+      allow update: if isAdminWrite();
+      allow list, delete: if false;
+    }
+
+    // Dự phòng lưu PII riêng biệt nếu Admin chưa khởi tạo vault
+    match /gc_orders_private/{bookingCode} {
+      allow create: if true;
+      allow read, update, delete: if isAdminAuth();
+    }
+
+    // Phiên đăng nhập Admin (cấm đọc/liệt kê công khai)
+    match /gc_admin_sessions/{token} {
+      allow create: if exists(/databases/$(database)/documents/gc_secrets/admin) &&
+                    request.resource.data.keyHash == get(/databases/$(database)/documents/gc_secrets/admin).data.keyHash;
+      allow read, update, delete: if false;
+    }
+
+    // Gói dịch vụ, bản đồ và cấu hình lịch trống Game Cùng
+    match /gc_packages/{pkgId} {
+      allow read: if true;
+      allow create, update: if isAdminWrite();
+      allow delete: if isAdminAuth();
+    }
+
+    match /gc_maps/{mapId} {
+      allow read: if true;
+      allow create, update: if isAdminWrite();
+      allow delete: if isAdminAuth();
+    }
+
+    match /gc_config/{docId} {
+      allow read: if true;
+      allow create, update: if isAdminWrite();
+      allow delete: if isAdminAuth();
+    }
+
+    // Đơn đặt lịch Game Cùng (PII đã mã hóa RSA-OAEP, đơn mới bắt buộc là Pending)
+    match /gc_orders/{bookingCode} {
+      allow read: if true;
+      allow create: if request.resource.data.status == "Pending" &&
+                    !("discordId" in request.resource.data) &&
+                    !("customerName" in request.resource.data) &&
+                    !("gameId" in request.resource.data);
+      allow update: if isAdminWrite() || (
+        resource.data.status == "Completed" &&
+        resource.data.reviewed == false &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(["reviewed"]) &&
+        request.resource.data.reviewed == true
+      );
+      allow delete: if isAdminAuth();
+    }
+
+    // Đánh giá đã xác thực từ đơn hàng hoàn thành (Completed)
+    match /gc_reviews/{reviewId} {
+      allow read: if true;
+      allow create: if request.resource.data.bookingCode is string &&
+                    exists(/databases/$(database)/documents/gc_orders/$(request.resource.data.bookingCode)) &&
+                    get(/databases/$(database)/documents/gc_orders/$(request.resource.data.bookingCode)).data.status == "Completed" &&
+                    get(/databases/$(database)/documents/gc_orders/$(request.resource.data.bookingCode)).data.reviewed == false &&
+                    request.resource.data.verified == true &&
+                    !("discordId" in request.resource.data);
+      allow update: if isAdminWrite();
+      allow delete: if isAdminAuth();
     }
 
     match /{document=**} {

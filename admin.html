@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quản Trị Game Cùng Delta Force – HcuGaming Admin</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="stylesheet" href="/css/game-cung.css" />
+</head>
+<body>
+  <header class="tac-header">
+    <div class="container tac-header-inner">
+      <a href="/game-cung" class="tac-brand">
+        <span class="tac-brand-mark">HG</span>
+        <span>Admin <span class="accent">Game Cùng</span></span>
+      </a>
+
+      <div style="display: flex; gap: 10px; align-items: center;">
+        <a href="/game-cung" class="btn btn-outline btn-sm">← Xem trang /game-cung</a>
+        <button type="button" id="admin-logout-btn" class="btn btn-danger btn-sm" hidden>Đăng xuất</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="tac-section">
+    <div class="container">
+      <!-- Màn hình Khởi tạo / Đăng nhập Admin -->
+      <section id="admin-auth-view" style="max-width: 480px; margin: 24px auto;">
+        <div class="panel-card form-stack">
+          <span class="tac-kicker">BẢO MẬT QUẢN TRỊ</span>
+          <h1 id="auth-heading" style="font-size: 1.5rem;">Đăng Nhập Quản Trị Game Cùng</h1>
+          <p id="auth-desc" style="font-size: 0.9rem; color: var(--text-muted);">
+            Nhập mật khẩu Quản trị để mở khóa phiên chỉnh sửa và giải mã Discord ID khách hàng.
+          </p>
+
+          <form id="admin-pass-form" class="form-stack">
+            <div class="field">
+              <label for="admin-pass-input">Mật khẩu Quản trị <span class="req">*</span></label>
+              <input type="password" id="admin-pass-input" placeholder="Nhập mật khẩu Admin (tối thiểu 6 ký tự)" required />
+            </div>
+
+            <div id="admin-pass-confirm-wrap" class="field" hidden>
+              <label for="admin-pass-confirm">Nhập lại mật khẩu để khởi tạo khóa mã hóa lần đầu <span class="req">*</span></label>
+              <input type="password" id="admin-pass-confirm" placeholder="Xác nhận mật khẩu Admin" />
+            </div>
+
+            <div id="auth-error" class="alert-msg alert-error" hidden></div>
+            <button type="submit" id="admin-login-btn" class="btn btn-primary btn-full">Đăng nhập Quản trị</button>
+          </form>
+
+          <div style="border-top: 1px solid var(--border); padding-top: 12px; text-align: center;">
+            <button type="button" id="google-login-btn" class="btn btn-outline btn-full btn-sm">
+              Đăng nhập bằng Google (hoangvancu1999@gmail.com)
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Bảng điều khiển Admin sau khi đăng nhập -->
+      <section id="admin-dashboard-view" hidden>
+        <!-- KPI Thống kê doanh thu, giờ chơi, gói đặt nhiều nhất -->
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <div class="kpi-label">Đơn chờ xác nhận (Pending)</div>
+            <div id="kpi-pending" class="kpi-val" style="color: var(--tac-amber);">0</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Tổng doanh thu (Paid &amp; Completed)</div>
+            <div id="kpi-revenue" class="kpi-val">0 VNĐ</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Tổng số giờ chơi (Đã xác nhận/Hoàn thành)</div>
+            <div id="kpi-hours" class="kpi-val" style="color: var(--tac-cyan);">0 giờ</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Gói được đặt nhiều nhất</div>
+            <div id="kpi-top-pkg" class="kpi-val" style="font-size: 1.05rem; color: var(--text);">Chưa có dữ liệu</div>
+          </div>
+        </div>
+
+        <!-- Thanh chuyển Tab Quản trị -->
+        <div class="admin-tabs" role="tablist">
+          <button type="button" class="admin-tab active" data-tab="tab-orders">1. Đơn đặt lịch</button>
+          <button type="button" class="admin-tab" data-tab="tab-packages">2. Gói dịch vụ &amp; Giá</button>
+          <button type="button" class="admin-tab" data-tab="tab-schedule">3. Lịch trống &amp; Bản đồ</button>
+          <button type="button" class="admin-tab" data-tab="tab-customers">4. Khách hàng</button>
+          <button type="button" class="admin-tab" data-tab="tab-reviews">5. Đánh giá</button>
+        </div>
+
+        <div id="admin-toast" class="alert-msg alert-success" style="margin-bottom: 16px;" hidden></div>
+
+        <!-- TAB 1: QUẢN LÝ ĐƠN ĐẶT LỊCH -->
+        <div id="tab-orders" class="admin-pane panel-card">
+          <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px;">
+            <h3>Quản lý đơn đặt lịch</h3>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <select id="filter-order-status" style="background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px;">
+                <option value="all">Tất cả trạng thái</option>
+                <option value="Pending">Pending – Chờ xác nhận</option>
+                <option value="Confirmed">Confirmed – Đã xác nhận</option>
+                <option value="Paid">Paid – Đã thanh toán</option>
+                <option value="In Progress">In Progress – Đang diễn ra</option>
+                <option value="Completed">Completed – Hoàn thành</option>
+                <option value="Cancelled">Cancelled – Đã hủy</option>
+              </select>
+              <button type="button" id="refresh-orders-btn" class="btn btn-outline btn-sm">Làm mới</button>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table class="tac-table">
+              <thead>
+                <tr>
+                  <th>Mã đơn</th>
+                  <th>Khách hàng &amp; Discord ID</th>
+                  <th>Gói / Chế độ / Map</th>
+                  <th>Lịch chơi</th>
+                  <th>Giá</th>
+                  <th>Trạng thái</th>
+                  <th>Thao tác</th>
+                </tr>
+              </thead>
+              <tbody id="orders-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- TAB 2: QUẢN LÝ GÓI DỊCH VỤ & BẢNG GIÁ -->
+        <div id="tab-packages" class="admin-pane panel-card" hidden>
+          <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px;">
+            <h3>Quản lý Gói dịch vụ &amp; Điều chỉnh giá</h3>
+            <button type="button" id="new-pkg-btn" class="btn btn-primary btn-sm">+ Thêm gói mới</button>
+          </div>
+
+          <!-- Form thêm/sửa gói -->
+          <form id="pkg-form" class="channel-box form-stack" style="margin-bottom: 20px;" hidden>
+            <h4 id="pkg-form-title">Chỉnh sửa gói dịch vụ</h4>
+            <input type="hidden" id="p-id" />
+            <div class="form-grid-2">
+              <div class="field">
+                <label for="p-name">Tên gói dịch vụ</label>
+                <input type="text" id="p-name" required />
+              </div>
+              <div class="field">
+                <label for="p-audience">Đối tượng / Nhãn</label>
+                <input type="text" id="p-audience" placeholder="Ví dụ: Người mới" required />
+              </div>
+            </div>
+            <div class="form-grid-2">
+              <div class="field">
+                <label for="p-duration">Thời lượng chuẩn (phút)</label>
+                <select id="p-duration">
+                  <option value="30">30 phút</option>
+                  <option value="60">60 phút</option>
+                  <option value="90">90 phút</option>
+                  <option value="120">120 phút</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="p-price">Giá VNĐ (nhập 0 và tick "Giá Liên hệ" nếu thỏa thuận)</label>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                  <input type="number" id="p-price" min="0" step="1000" value="49000" />
+                  <label style="white-space: nowrap; display: flex; gap: 5px; align-items: center;">
+                    <input type="checkbox" id="p-custom-price" /> Giá Liên hệ
+                  </label>
+                </div>
+              </div>
+            </div>
+            <div class="form-grid-2">
+              <div class="field">
+                <label for="p-modes">Chế độ hỗ trợ (phân cách dấu phẩy)</label>
+                <input type="text" id="p-modes" value="Operations, Warfare, Detonation" />
+              </div>
+              <div class="field">
+                <label for="p-visible">Trạng thái hiển thị</label>
+                <select id="p-visible">
+                  <option value="true">Hiển thị công khai</option>
+                  <option value="false">Tạm ẩn khỏi bảng giá</option>
+                </select>
+              </div>
+            </div>
+            <div class="field">
+              <label for="p-desc">Mô tả nội dung gói</label>
+              <textarea id="p-desc" rows="2" required></textarea>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button type="submit" class="btn btn-primary btn-sm">Lưu gói dịch vụ</button>
+              <button type="button" id="cancel-pkg-btn" class="btn btn-outline btn-sm">Hủy</button>
+            </div>
+          </form>
+
+          <div class="table-wrap">
+            <table class="tac-table">
+              <thead>
+                <tr>
+                  <th>Tên gói</th>
+                  <th>Thời lượng</th>
+                  <th>Chế độ</th>
+                  <th>Giá hiện tại</th>
+                  <th>Hiển thị</th>
+                  <th>Thao tác</th>
+                </tr>
+              </thead>
+              <tbody id="pkgs-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- TAB 3: QUẢN LÝ LỊCH TRỐNG & BẢN ĐỒ -->
+        <div id="tab-schedule" class="admin-pane form-stack" hidden>
+          <div class="panel-card form-stack">
+            <h3>Cấu hình khung giờ hoạt động &amp; Khóa lịch bận</h3>
+            <form id="schedule-config-form" class="form-grid-2">
+              <div class="field">
+                <label for="cfg-open">Giờ mở lịch (0–23)</label>
+                <input type="number" id="cfg-open" min="0" max="23" value="8" />
+              </div>
+              <div class="field">
+                <label for="cfg-close">Giờ đóng lịch (1–24)</label>
+                <input type="number" id="cfg-close" min="1" max="24" value="23" />
+              </div>
+              <div class="field">
+                <label for="cfg-discord">Link mời Discord chính thức</label>
+                <input type="url" id="cfg-discord" value="https://discord.gg/hcugaming" />
+              </div>
+              <div class="field" style="justify-content: flex-end;">
+                <button type="submit" class="btn btn-primary">Lưu cấu hình chung</button>
+              </div>
+            </form>
+
+            <div style="border-top: 1px solid var(--border); padding-top: 16px;">
+              <h4>Khóa / Mở khóa khung giờ bận cụ thể</h4>
+              <div style="display: flex; flex-wrap: wrap; gap: 10px; margin: 10px 0;">
+                <input type="date" id="block-date" style="background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 8px;" />
+                <input type="time" id="block-time" step="1800" value="20:00" style="background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 8px;" />
+                <button type="button" id="add-block-btn" class="btn btn-amber btn-sm">Khóa khung giờ này</button>
+              </div>
+              <div id="blocked-slots-list" class="pkg-meta"></div>
+            </div>
+          </div>
+
+          <div class="panel-card form-stack">
+            <h3>Quản lý danh sách Bản đồ Delta Force đang hoạt động</h3>
+            <form id="add-map-form" style="display: flex; flex-wrap: wrap; gap: 10px;">
+              <input type="text" id="new-map-name" placeholder="Tên bản đồ mới..." required style="background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px;" />
+              <select id="new-map-mode" style="background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px;">
+                <option value="Operations">Operations</option>
+                <option value="Warfare">Warfare</option>
+                <option value="Detonation">Detonation</option>
+              </select>
+              <button type="submit" class="btn btn-primary btn-sm">+ Thêm bản đồ</button>
+            </form>
+            <div class="table-wrap">
+              <table class="tac-table">
+                <thead>
+                  <tr>
+                    <th>Bản đồ</th>
+                    <th>Chế độ</th>
+                    <th>Trạng thái</th>
+                    <th>Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody id="maps-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 4: QUẢN LÝ KHÁCH HÀNG -->
+        <div id="tab-customers" class="admin-pane panel-card" hidden>
+          <h3 style="margin-bottom: 14px;">Danh sách Khách hàng (Chỉ hiển thị trong phiên Admin)</h3>
+          <div class="table-wrap">
+            <table class="tac-table">
+              <thead>
+                <tr>
+                  <th>Họ tên / Biệt danh</th>
+                  <th>Discord ID</th>
+                  <th>Game ID</th>
+                  <th>Số đơn đã đặt</th>
+                  <th>Tổng chi tiêu</th>
+                  <th>Đơn gần nhất</th>
+                </tr>
+              </thead>
+              <tbody id="customers-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- TAB 5: QUẢN LÝ ĐÁNH GIÁ -->
+        <div id="tab-reviews" class="admin-pane panel-card" hidden>
+          <h3 style="margin-bottom: 14px;">Quản lý Đánh giá dịch vụ</h3>
+          <div class="table-wrap">
+            <table class="tac-table">
+              <thead>
+                <tr>
+                  <th>Mã đơn</th>
+                  <th>Khách (Ẩn danh)</th>
+                  <th>Điểm TB</th>
+                  <th>Nhận xét</th>
+                  <th>Trạng thái</th>
+                  <th>Thao tác</th>
+                </tr>
+              </thead>
+              <tbody id="reviews-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script type="module" src="/js/gc-admin.js"></script>
+</body>
+</html>

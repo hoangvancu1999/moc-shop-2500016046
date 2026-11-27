@@ -1,0 +1,6 @@
+{
+  "rewrites": [
+    { "source": "/game-cung", "destination": "/game-cung.html" },
+    { "source": "/admin", "destination": "/admin.html" }
+  ]
+}
