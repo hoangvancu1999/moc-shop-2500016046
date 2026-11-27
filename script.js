@@ -1,77 +1,110 @@
-// Khóa lưu giỏ hàng trong localStorage
-const CART_STORAGE_KEY = "moc_cafe_cart";
-const SHIPPING_FEE = 25000;
-const FREE_SHIP_THRESHOLD = 300000;
+const CART_KEY = "hcugaming_cart";
+const SERVICE_FEE = 25000;
+const FREE_FEE_THRESHOLD = 300000;
 
-let activeCategory = "all";
+let activeGame = "all";
+let activePriceRange = "all";
+let searchQuery = "";
+let activeServiceGroup = "all";
 let cart = loadCart();
 let toastTimer = null;
 
-// Định dạng tiền VNĐ dạng 120.000đ
 function formatVND(amount) {
   return `${Number(amount).toLocaleString("vi-VN")}đ`;
 }
 
-// Đọc giỏ hàng từ localStorage
 function loadCart() {
   try {
-    const raw = localStorage.getItem(CART_STORAGE_KEY);
+    const raw = localStorage.getItem(CART_KEY);
     const parsed = raw ? JSON.parse(raw) : [];
     return Array.isArray(parsed) ? parsed : [];
-  } catch (error) {
+  } catch (e) {
     return [];
   }
 }
 
-// Lưu giỏ hàng vào localStorage
 function saveCart() {
   try {
-    localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
-  } catch (error) {
-    // Bỏ qua nếu trình duyệt chặn localStorage
+    localStorage.setItem(CART_KEY, JSON.stringify(cart));
+  } catch (e) {
+    // Bỏ qua nếu bị chặn
   }
 }
 
-// Tìm sản phẩm theo id
-function findProductById(productId) {
-  return PRODUCTS.find((item) => item.id === productId);
-}
-
-// Hiển thị thông báo ngắn khi thêm vào giỏ
-function showToast(message) {
-  const toastEl = document.getElementById("toast");
-  toastEl.textContent = message;
-  toastEl.hidden = false;
+function showToast(msg) {
+  const el = document.getElementById("toast");
+  el.textContent = msg;
+  el.hidden = false;
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => {
-    toastEl.hidden = true;
+    el.hidden = true;
   }, 2200);
 }
 
-// Render danh sách sản phẩm theo bộ lọc hiện tại
-function renderProducts() {
-  const listEl = document.getElementById("product-list");
-  const filtered =
-    activeCategory === "all"
-      ? PRODUCTS
-      : PRODUCTS.filter((p) => p.category === activeCategory);
+function findCatalogItem(id) {
+  const acc = ACCOUNTS.find((a) => a.id === id);
+  if (acc) return { ...acc, type: "account" };
+  const srv = SERVICES.find((s) => s.id === id);
+  if (srv) return { ...srv, type: "service" };
+  return null;
+}
 
-  listEl.innerHTML = filtered
+// Lọc và render Account Game
+function renderAccounts() {
+  const gridEl = document.getElementById("account-grid");
+  const emptyEl = document.getElementById("account-empty");
+  const q = searchQuery.trim().toLowerCase();
+
+  const filtered = ACCOUNTS.filter((acc) => {
+    if (activeGame !== "all" && acc.game !== activeGame) return false;
+
+    if (activePriceRange === "under-300" && acc.price >= 300000) return false;
+    if (activePriceRange === "300-800" && (acc.price < 300000 || acc.price > 800000)) return false;
+    if (activePriceRange === "over-800" && acc.price <= 800000) return false;
+
+    if (q) {
+      const hay = `${acc.id} ${acc.title} ${acc.rank} ${acc.gameLabel} ${acc.stats.join(" ")}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+
+    return true;
+  });
+
+  if (filtered.length === 0) {
+    gridEl.innerHTML = "";
+    emptyEl.hidden = false;
+    return;
+  }
+
+  emptyEl.hidden = true;
+  gridEl.innerHTML = filtered
     .map(
-      (product) => `
-      <article class="product-card">
-        <div class="product-thumb" style="background-color: ${product.bgColor};">
-          <span class="product-category-tag">${product.categoryLabel}</span>
-          <span aria-hidden="true">${product.emoji}</span>
+      (acc) => `
+      <article class="acc-card">
+        <div class="acc-banner" style="background: linear-gradient(135deg, ${acc.themeColor}, #111827);">
+          <div class="acc-banner-left">
+            <span class="acc-icon" aria-hidden="true">${acc.icon}</span>
+            <div>
+              <div class="acc-game-name">${acc.gameLabel}</div>
+              <span class="acc-code">#${acc.id}</span>
+            </div>
+          </div>
+          <span class="acc-status">${acc.badge}</span>
         </div>
-        <div class="product-body">
-          <h3 class="product-title">${product.name}</h3>
-          <p class="product-desc">${product.description}</p>
-          <div class="product-footer">
-            <span class="product-price">${formatVND(product.price)}</span>
-            <button type="button" class="add-to-cart-btn" data-id="${product.id}">
-              Thêm vào giỏ
-            </button>
+
+        <div class="acc-body">
+          <div class="acc-rank">${acc.rank}</div>
+          <h3 class="acc-title">${acc.title}</h3>
+          <div class="acc-tags">
+            ${acc.stats.map((st) => `<span class="acc-tag">${st}</span>`).join("")}
+          </div>
+
+          <div class="acc-footer">
+            <span class="acc-price">${formatVND(acc.price)}</span>
+            <div class="acc-actions">
+              <button type="button" class="btn btn-outline btn-sm detail-btn" data-id="${acc.id}">Chi tiết</button>
+              <button type="button" class="btn btn-cyan btn-sm add-btn" data-id="${acc.id}">Chọn mua</button>
+            </div>
           </div>
         </div>
       </article>
@@ -80,67 +113,146 @@ function renderProducts() {
     .join("");
 }
 
-// Thêm sản phẩm vào giỏ
-function addToCart(productId) {
-  const product = findProductById(productId);
-  if (!product) return;
+// Render Dịch vụ Game
+function renderServices() {
+  const gridEl = document.getElementById("service-grid");
+  const filtered =
+    activeServiceGroup === "all"
+      ? SERVICES
+      : SERVICES.filter((s) => s.group === activeServiceGroup);
 
-  const existing = cart.find((item) => item.id === productId);
+  gridEl.innerHTML = filtered
+    .map(
+      (srv) => `
+      <article class="service-card">
+        <div class="service-top">
+          <span class="service-icon" aria-hidden="true">${srv.icon}</span>
+          <span class="service-pill">${srv.groupLabel}</span>
+        </div>
+        <div class="service-game">${srv.gameLabel}</div>
+        <h3 class="service-title">${srv.title}</h3>
+        <p class="service-desc">${srv.description}</p>
+        <ul class="service-list">
+          ${srv.highlights.map((h) => `<li>${h}</li>`).join("")}
+        </ul>
+        <div class="service-footer">
+          <div class="service-price-wrap">
+            <span class="service-price">${formatVND(srv.price)}</span>
+            <span class="service-unit">/ ${srv.unit}</span>
+          </div>
+          <button type="button" class="btn btn-gold btn-sm add-btn" data-id="${srv.id}">Đặt dịch vụ</button>
+        </div>
+      </article>
+    `
+    )
+    .join("");
+}
+
+// Mở modal chi tiết Account
+function openDetailModal(accId) {
+  const acc = ACCOUNTS.find((a) => a.id === accId);
+  if (!acc) return;
+
+  document.getElementById("modal-code").textContent = `#${acc.id} • ${acc.gameLabel}`;
+  document.getElementById("modal-body").innerHTML = `
+    <h3 id="modal-title">${acc.title}</h3>
+    <div class="acc-rank">Hạng / Cấp độ: ${acc.rank}</div>
+    <p class="service-desc">${acc.description}</p>
+    <div class="acc-tags">
+      ${acc.stats.map((st) => `<span class="acc-tag">${st}</span>`).join("")}
+    </div>
+    <div class="acc-footer">
+      <span class="acc-price">${formatVND(acc.price)}</span>
+      <button type="button" class="btn btn-cyan" id="modal-add-btn" data-id="${acc.id}">Thêm vào đơn hàng</button>
+    </div>
+  `;
+
+  document.getElementById("detail-overlay").hidden = false;
+  document.getElementById("detail-modal").hidden = false;
+
+  document.getElementById("modal-add-btn").addEventListener("click", () => {
+    addToCart(acc.id);
+    closeDetailModal();
+  });
+}
+
+function closeDetailModal() {
+  document.getElementById("detail-overlay").hidden = true;
+  document.getElementById("detail-modal").hidden = true;
+}
+
+// Giỏ hàng
+function addToCart(itemId) {
+  const item = findCatalogItem(itemId);
+  if (!item) return;
+
+  const existing = cart.find((c) => c.id === itemId);
   if (existing) {
+    if (item.type === "account") {
+      showToast(`Mã acc #${item.id} đã có trong đơn hàng`);
+      return;
+    }
     existing.qty += 1;
   } else {
-    cart.push({ id: productId, qty: 1 });
+    cart.push({ id: itemId, qty: 1 });
   }
 
   saveCart();
   renderCart();
-  showToast(`Đã thêm "${product.name}" vào giỏ hàng`);
+  showToast(`Đã thêm "${item.title}" vào đơn hàng`);
 }
 
-// Tăng/giảm số lượng hoặc xóa món
-function updateQuantity(productId, delta) {
-  const index = cart.findIndex((item) => item.id === productId);
+function updateCartQty(itemId, delta) {
+  const index = cart.findIndex((c) => c.id === itemId);
   if (index === -1) return;
 
-  cart[index].qty += delta;
-  if (cart[index].qty <= 0) {
+  const item = findCatalogItem(itemId);
+  const nextQty = cart[index].qty + delta;
+
+  if (nextQty <= 0) {
     cart.splice(index, 1);
+  } else if (item && item.type === "account" && nextQty > 1) {
+    showToast("Mỗi tài khoản game là duy nhất (số lượng tối đa 1)");
+    return;
+  } else {
+    cart[index].qty = nextQty;
   }
 
   saveCart();
   renderCart();
 }
 
-function removeFromCart(productId) {
-  cart = cart.filter((item) => item.id !== productId);
+function removeCartItem(itemId) {
+  cart = cart.filter((c) => c.id !== itemId);
   saveCart();
   renderCart();
 }
 
-// Render giỏ hàng, tạm tính, phí giao hàng và tổng tiền
 function renderCart() {
-  const countEl = document.getElementById("cart-count");
+  const badgeEl = document.getElementById("cart-count");
   const itemsEl = document.getElementById("cart-items");
   const emptyEl = document.getElementById("cart-empty");
   const summaryEl = document.getElementById("cart-summary");
-  const formEl = document.getElementById("checkout-form");
-  const subtotalEl = document.getElementById("subtotal-amount");
-  const shippingEl = document.getElementById("shipping-amount");
-  const totalEl = document.getElementById("total-amount");
-  const hintEl = document.getElementById("free-ship-hint");
+  const formEl = document.getElementById("order-form");
+  const qtyEl = document.getElementById("summary-qty");
+  const subtotalEl = document.getElementById("summary-subtotal");
+  const feeEl = document.getElementById("summary-fee");
+  const hintEl = document.getElementById("fee-hint");
+  const totalEl = document.getElementById("summary-total");
 
-  const totalQty = cart.reduce((sum, item) => sum + item.qty, 0);
-  countEl.textContent = totalQty;
+  const totalQty = cart.reduce((sum, c) => sum + c.qty, 0);
+  badgeEl.textContent = totalQty;
 
   if (cart.length === 0) {
     itemsEl.innerHTML = "";
     emptyEl.hidden = false;
     summaryEl.hidden = true;
     formEl.hidden = true;
+    qtyEl.textContent = "0";
     subtotalEl.textContent = "0đ";
-    shippingEl.textContent = "0đ";
-    totalEl.textContent = "0đ";
+    feeEl.textContent = "0đ";
     hintEl.textContent = "";
+    totalEl.textContent = "0đ";
     return;
   }
 
@@ -151,48 +263,46 @@ function renderCart() {
   let subtotal = 0;
 
   itemsEl.innerHTML = cart
-    .map((cartItem) => {
-      const product = findProductById(cartItem.id);
-      if (!product) return "";
-      const lineTotal = product.price * cartItem.qty;
+    .map((entry) => {
+      const item = findCatalogItem(entry.id);
+      if (!item) return "";
+      const lineTotal = item.price * entry.qty;
       subtotal += lineTotal;
 
       return `
         <li class="cart-item">
-          <div class="cart-item-emoji" style="background-color: ${product.bgColor};" aria-hidden="true">
-            ${product.emoji}
-          </div>
           <div>
-            <div class="cart-item-name">${product.name}</div>
-            <div class="cart-item-price">${formatVND(product.price)} × ${cartItem.qty} = <strong>${formatVND(lineTotal)}</strong></div>
+            <div class="cart-item-title">${item.type === "account" ? `[#${item.id}] ` : ""}${item.title}</div>
+            <div class="cart-item-meta">${formatVND(item.price)} × ${entry.qty} = <strong>${formatVND(lineTotal)}</strong></div>
           </div>
-          <div class="cart-item-controls">
-            <button type="button" class="qty-btn" data-action="dec" data-id="${product.id}" aria-label="Giảm số lượng">-</button>
-            <span class="qty-value">${cartItem.qty}</span>
-            <button type="button" class="qty-btn" data-action="inc" data-id="${product.id}" aria-label="Tăng số lượng">+</button>
-            <button type="button" class="remove-btn" data-action="remove" data-id="${product.id}">Xóa</button>
+          <div class="cart-controls">
+            ${
+              item.type === "service"
+                ? `<button type="button" class="qty-btn" data-action="dec" data-id="${item.id}" aria-label="Giảm">-</button>
+                   <span>${entry.qty}</span>
+                   <button type="button" class="qty-btn" data-action="inc" data-id="${item.id}" aria-label="Tăng">+</button>`
+                : ""
+            }
+            <button type="button" class="remove-btn" data-action="remove" data-id="${item.id}">Xóa</button>
           </div>
         </li>
       `;
     })
     .join("");
 
-  const shipping = subtotal >= FREE_SHIP_THRESHOLD ? 0 : SHIPPING_FEE;
-  const total = subtotal + shipping;
+  const fee = subtotal >= FREE_FEE_THRESHOLD ? 0 : SERVICE_FEE;
+  const grandTotal = subtotal + fee;
 
+  qtyEl.textContent = totalQty;
   subtotalEl.textContent = formatVND(subtotal);
-  shippingEl.textContent = shipping === 0 ? "Miễn phí (0đ)" : formatVND(shipping);
-  totalEl.textContent = formatVND(total);
-
-  if (shipping === 0) {
-    hintEl.textContent = "🎉 Đơn hàng của bạn đã được miễn phí giao hàng!";
-  } else {
-    const remaining = FREE_SHIP_THRESHOLD - subtotal;
-    hintEl.textContent = `Mua thêm ${formatVND(remaining)} để được miễn phí giao hàng.`;
-  }
+  feeEl.textContent = fee === 0 ? "Miễn phí (0đ)" : formatVND(fee);
+  hintEl.textContent =
+    fee === 0
+      ? "🎉 Đơn từ 300.000đ được miễn phí phí giao dịch trung gian!"
+      : `Đơn dưới 300.000đ có phí giao dịch trung gian ${formatVND(SERVICE_FEE)} (thêm ${formatVND(FREE_FEE_THRESHOLD - subtotal)} để miễn phí).`;
+  totalEl.textContent = formatVND(grandTotal);
 }
 
-// Mở / đóng ngăn kéo giỏ hàng
 function openCart() {
   document.getElementById("order-success").hidden = true;
   document.getElementById("cart-overlay").hidden = false;
@@ -204,98 +314,116 @@ function closeCart() {
   document.getElementById("cart-drawer").hidden = true;
 }
 
-// Tạo mã đơn hàng ngẫu nhiên dạng MC-123456
-function generateOrderCode() {
-  const randomNum = Math.floor(100000 + Math.random() * 900000);
-  return `MC-${randomNum}`;
-}
+function handleOrderSubmit(e) {
+  e.preventDefault();
+  const name = document.getElementById("buyer-name").value.trim();
+  const contact = document.getElementById("buyer-contact").value.trim();
+  const consent = document.getElementById("buyer-consent").checked;
+  const errEl = document.getElementById("order-error");
 
-// Xử lý đặt hàng COD
-function handleCheckoutSubmit(event) {
-  event.preventDefault();
-
-  const nameInput = document.getElementById("customer-name");
-  const phoneInput = document.getElementById("customer-phone");
-  const addressInput = document.getElementById("customer-address");
-  const consentCheckbox = document.getElementById("consent-checkbox");
-  const errorEl = document.getElementById("form-error");
-
-  const name = nameInput.value.trim();
-  const phone = phoneInput.value.trim();
-  const address = addressInput.value.trim();
-
-  let errorMessage = "";
+  let errMsg = "";
+  const cleanPhone = contact.replace(/[\s.-]/g, "");
   if (cart.length === 0) {
-    errorMessage = "Giỏ hàng đang trống, vui lòng thêm sản phẩm trước khi đặt hàng.";
+    errMsg = "Đơn hàng đang trống, vui lòng chọn tài khoản hoặc dịch vụ.";
   } else if (!name) {
-    errorMessage = "Vui lòng nhập họ tên người nhận.";
-  } else if (!/^[0-9+\s.-]{9,15}$/.test(phone)) {
-    errorMessage = "Vui lòng nhập số điện thoại hợp lệ (9–15 ký tự số).";
-  } else if (!address) {
-    errorMessage = "Vui lòng nhập địa chỉ giao hàng.";
-  } else if (!consentCheckbox.checked) {
-    errorMessage = "Vui lòng tick chọn đồng ý cho cửa hàng dùng thông tin này để giao hàng.";
+    errMsg = "Vui lòng nhập tên hoặc biệt danh của bạn.";
+  } else if (!/^(0|\+84)\d{8,10}$/.test(cleanPhone)) {
+    errMsg = "Vui lòng nhập số điện thoại hợp lệ (9–11 chữ số, bắt đầu bằng 0 hoặc +84).";
+  } else if (!consent) {
+    errMsg = "Vui lòng tick chọn đồng ý xác nhận thông tin liên hệ.";
   }
 
-  if (errorMessage) {
-    errorEl.textContent = errorMessage;
-    errorEl.hidden = false;
+  if (errMsg) {
+    errEl.textContent = errMsg;
+    errEl.hidden = false;
     return;
   }
 
-  errorEl.hidden = true;
-
-  // Tạo mã đơn, xóa giỏ hàng và hiển thị lời cảm ơn
-  const orderCode = generateOrderCode();
-  document.getElementById("order-code").textContent = orderCode;
+  errEl.hidden = true;
+  const code = `HCU-${Math.floor(100000 + Math.random() * 900000)}`;
+  document.getElementById("order-code").textContent = code;
 
   cart = [];
   saveCart();
   renderCart();
 
-  document.getElementById("checkout-form").reset();
+  document.getElementById("order-form").reset();
   document.getElementById("cart-empty").hidden = true;
   document.getElementById("order-success").hidden = false;
 }
 
-// Gắn sự kiện khi DOM sẵn sàng
 document.addEventListener("DOMContentLoaded", () => {
-  renderProducts();
+  renderAccounts();
+  renderServices();
   renderCart();
 
-  // Bộ lọc nhóm sản phẩm
-  document.querySelectorAll(".filter-btn").forEach((btn) => {
+  // Lọc game Account
+  document.querySelectorAll(".tab-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
-      document.querySelectorAll(".filter-btn").forEach((b) => b.classList.remove("active"));
+      document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
-      activeCategory = btn.dataset.category;
-      renderProducts();
+      activeGame = btn.dataset.game;
+      renderAccounts();
     });
   });
 
-  // Thêm vào giỏ hàng
-  document.getElementById("product-list").addEventListener("click", (event) => {
-    const btn = event.target.closest(".add-to-cart-btn");
-    if (!btn) return;
-    addToCart(btn.dataset.id);
+  // Lọc giá & tìm kiếm
+  document.getElementById("price-filter").addEventListener("change", (e) => {
+    activePriceRange = e.target.value;
+    renderAccounts();
   });
 
-  // Tăng/giảm/xóa trong giỏ hàng
-  document.getElementById("cart-items").addEventListener("click", (event) => {
-    const btn = event.target.closest("button[data-action]");
+  document.getElementById("account-search").addEventListener("input", (e) => {
+    searchQuery = e.target.value;
+    renderAccounts();
+  });
+
+  // Lọc Dịch vụ
+  document.querySelectorAll(".service-tab-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".service-tab-btn").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      activeServiceGroup = btn.dataset.group;
+      renderServices();
+    });
+  });
+
+  // Click trong Account Grid & Service Grid
+  document.getElementById("account-grid").addEventListener("click", (e) => {
+    const detailBtn = e.target.closest(".detail-btn");
+    if (detailBtn) {
+      openDetailModal(detailBtn.dataset.id);
+      return;
+    }
+    const addBtn = e.target.closest(".add-btn");
+    if (addBtn) {
+      addToCart(addBtn.dataset.id);
+    }
+  });
+
+  document.getElementById("service-grid").addEventListener("click", (e) => {
+    const addBtn = e.target.closest(".add-btn");
+    if (addBtn) {
+      addToCart(addBtn.dataset.id);
+    }
+  });
+
+  // Điều khiển giỏ hàng
+  document.getElementById("cart-items").addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-action]");
     if (!btn) return;
     const { action, id } = btn.dataset;
-    if (action === "inc") updateQuantity(id, 1);
-    if (action === "dec") updateQuantity(id, -1);
-    if (action === "remove") removeFromCart(id);
+    if (action === "inc") updateCartQty(id, 1);
+    if (action === "dec") updateCartQty(id, -1);
+    if (action === "remove") removeCartItem(id);
   });
 
-  // Mở / đóng giỏ hàng
+  // Modal & Drawer controls
+  document.getElementById("close-detail-btn").addEventListener("click", closeDetailModal);
+  document.getElementById("detail-overlay").addEventListener("click", closeDetailModal);
   document.getElementById("open-cart-btn").addEventListener("click", openCart);
   document.getElementById("close-cart-btn").addEventListener("click", closeCart);
   document.getElementById("cart-overlay").addEventListener("click", closeCart);
-  document.getElementById("continue-shopping-btn").addEventListener("click", closeCart);
-
-  // Đặt hàng COD
-  document.getElementById("checkout-form").addEventListener("submit", handleCheckoutSubmit);
+  document.getElementById("continue-btn").addEventListener("click", closeCart);
+  document.getElementById("order-form").addEventListener("submit", handleOrderSubmit);
 });
