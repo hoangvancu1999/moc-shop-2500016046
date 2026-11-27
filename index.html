@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mộc Café – Cà phê hạt &amp; Dụng cụ pha chế tại TP.HCM</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- Thanh thông báo thực hành luôn hiển thị -->
+  <div class="practice-notice" role="banner">
+    ⚠️ Website thực hành – không bán hàng thật
+  </div>
+
+  <!-- Đầu trang -->
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="#" class="logo" aria-label="Trang chủ Mộc Café">
+        <span class="logo-mark">☕</span>
+        <span class="logo-text">Mộc Café</span>
+      </a>
+
+      <nav class="main-nav" aria-label="Menu chính">
+        <a href="#san-pham">Sản phẩm</a>
+        <a href="#chinh-sach">Chính sách</a>
+        <a href="#lien-he">Liên hệ</a>
+      </nav>
+
+      <button type="button" id="open-cart-btn" class="cart-btn" aria-label="Mở giỏ hàng">
+        <span class="cart-icon" aria-hidden="true">🛒</span>
+        <span class="cart-label">Giỏ hàng</span>
+        <span id="cart-count" class="cart-badge">0</span>
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <!-- Banner khuyến mãi -->
+    <section class="hero-banner">
+      <div class="container hero-content">
+        <span class="promo-tag">Ưu đãi tại TP.HCM</span>
+        <h1>Hương vị cà phê mộc nguyên bản mỗi sáng</h1>
+        <p class="hero-desc">
+          Cà phê hạt rang mới mỗi tuần &amp; dụng cụ pha chế tuyển chọn.
+          <strong>Miễn phí giao hàng cho đơn từ 300.000đ</strong> (đồng giá 25.000đ cho đơn dưới 300.000đ).
+        </p>
+        <div class="hero-actions">
+          <a href="#san-pham" class="btn btn-primary">Xem sản phẩm</a>
+          <span class="practice-pill">Website thực hành – không bán hàng thật</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Danh mục sản phẩm -->
+    <section id="san-pham" class="section">
+      <div class="container">
+        <div class="section-header">
+          <div>
+            <h2>Sản phẩm của Mộc Café</h2>
+            <p class="section-subtitle">Chọn cà phê hạt rang mộc hoặc dụng cụ pha chế phù hợp với gu của bạn.</p>
+          </div>
+          <div class="filter-group" role="group" aria-label="Lọc theo nhóm sản phẩm">
+            <button type="button" class="filter-btn active" data-category="all">Tất cả (8)</button>
+            <button type="button" class="filter-btn" data-category="ca-phe-hat">Cà phê hạt (4)</button>
+            <button type="button" class="filter-btn" data-category="dung-cu-pha-che">Dụng cụ pha chế (4)</button>
+          </div>
+        </div>
+
+        <div id="product-list" class="product-grid" aria-live="polite">
+          <!-- Render tự động bằng script.js -->
+        </div>
+      </div>
+    </section>
+
+    <!-- Chính sách -->
+    <section id="chinh-sach" class="section section-alt">
+      <div class="container">
+        <h2>Chính sách cửa hàng</h2>
+        <div class="policy-grid">
+          <article class="policy-card">
+            <div class="policy-icon" aria-hidden="true">🚚</div>
+            <h3>Chính sách giao hàng</h3>
+            <p>
+              Giao hàng tận nơi tại TP.HCM trong 1–2 ngày làm việc. Phí giao hàng
+              <strong>25.000đ</strong> cho đơn dưới 300.000đ và <strong>miễn phí</strong> cho đơn từ
+              <strong>300.000đ</strong> trở lên. Chỉ hỗ trợ thanh toán khi nhận hàng (COD).
+            </p>
+          </article>
+
+          <article class="policy-card">
+            <div class="policy-icon" aria-hidden="true">🔄</div>
+            <h3>Chính sách đổi trả trong 7 ngày</h3>
+            <p>
+              Hỗ trợ đổi trả miễn phí trong vòng <strong>7 ngày</strong> kể từ khi nhận hàng nếu sản phẩm bị lỗi
+              từ nhà sản xuất, hư hỏng khi vận chuyển hoặc giao nhầm món (vui lòng giữ nguyên bao bì, tem nhãn).
+            </p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Liên hệ -->
+    <section id="lien-he" class="section">
+      <div class="container">
+        <h2>Liên hệ Mộc Café</h2>
+        <div class="contact-box">
+          <div class="contact-item">
+            <strong>Địa chỉ:</strong> 128 Nguyễn Đình Chiểu, Quận 3, TP. Hồ Chí Minh
+          </div>
+          <div class="contact-item">
+            <strong>Điện thoại:</strong> 0900 123 456 (8:00 – 20:00 mỗi ngày)
+          </div>
+          <div class="contact-item">
+            <strong>Email:</strong> lienhe@moccafe.example.vn
+          </div>
+          <div class="contact-note">
+            Lưu ý: Website thực hành – không bán hàng thật.
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Chân trang -->
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <span>© 2026 Mộc Café – TP.HCM</span>
+      <span>Website thực hành – không bán hàng thật</span>
+    </div>
+  </footer>
+
+  <!-- Lớp phủ & Ngăn kéo Giỏ hàng + Đặt hàng COD -->
+  <div id="cart-overlay" class="cart-overlay" hidden></div>
+
+  <aside id="cart-drawer" class="cart-drawer" aria-label="Giỏ hàng và đặt hàng" hidden>
+    <div class="drawer-header">
+      <h2>Giỏ hàng của bạn</h2>
+      <button type="button" id="close-cart-btn" class="close-btn" aria-label="Đóng giỏ hàng">✕</button>
+    </div>
+
+    <div class="drawer-body">
+      <!-- Thông báo đặt hàng thành công -->
+      <div id="order-success" class="order-success" hidden>
+        <div class="success-icon" aria-hidden="true">✅</div>
+        <h3>Đặt hàng thành công!</h3>
+        <p>Cảm ơn bạn đã đặt hàng tại <strong>Mộc Café</strong>.</p>
+        <p class="order-code-box">Mã đơn hàng của bạn: <strong id="order-code"></strong></p>
+        <p class="success-note">
+          Đơn hàng thanh toán khi nhận hàng (COD) đã được ghi nhận. (Website thực hành – không gửi đơn thật).
+        </p>
+        <button type="button" id="continue-shopping-btn" class="btn btn-primary btn-full">Tiếp tục xem sản phẩm</button>
+      </div>
+
+      <!-- Danh sách món trong giỏ -->
+      <div id="cart-empty" class="cart-empty">
+        <p>Giỏ hàng của bạn đang trống.</p>
+        <p class="empty-hint">Hãy chọn thêm cà phê hạt hoặc dụng cụ pha chế nhé!</p>
+      </div>
+
+      <ul id="cart-items" class="cart-items"></ul>
+
+      <!-- Tổng kết tiền -->
+      <div id="cart-summary" class="cart-summary" hidden>
+        <div class="summary-row">
+          <span>Tạm tính</span>
+          <strong id="subtotal-amount">0đ</strong>
+        </div>
+        <div class="summary-row">
+          <span>Phí giao hàng</span>
+          <strong id="shipping-amount">0đ</strong>
+        </div>
+        <p id="free-ship-hint" class="free-ship-hint"></p>
+        <div class="summary-row summary-total">
+          <span>Tổng tiền</span>
+          <strong id="total-amount">0đ</strong>
+        </div>
+      </div>
+
+      <!-- Form đặt hàng COD -->
+      <form id="checkout-form" class="checkout-form" hidden novalidate>
+        <h3>Thông tin đặt hàng</h3>
+
+        <div class="form-group">
+          <label for="customer-name">Họ tên <span class="required">*</span></label>
+          <input type="text" id="customer-name" name="name" placeholder="Ví dụ: Nguyễn Văn An" required />
+        </div>
+
+        <div class="form-group">
+          <label for="customer-phone">Số điện thoại <span class="required">*</span></label>
+          <input type="tel" id="customer-phone" name="phone" placeholder="Ví dụ: 0901234567" required />
+        </div>
+
+        <div class="form-group">
+          <label for="customer-address">Địa chỉ giao hàng <span class="required">*</span></label>
+          <textarea id="customer-address" name="address" rows="2" placeholder="Số nhà, tên đường, phường/xã, quận/huyện tại TP.HCM" required></textarea>
+        </div>
+
+        <div class="form-group">
+          <label for="customer-note">Ghi chú</label>
+          <input type="text" id="customer-note" name="note" placeholder="Ví dụ: Xay sẵn cho pha phin, giao giờ hành chính" />
+        </div>
+
+        <div class="form-group">
+          <label>Phương thức thanh toán</label>
+          <div class="payment-cod">
+            <input type="radio" id="payment-cod" name="payment" value="COD" checked readonly />
+            <label for="payment-cod">Thanh toán khi nhận hàng (COD)</label>
+          </div>
+        </div>
+
+        <div class="form-group consent-group">
+          <label class="consent-label">
+            <input type="checkbox" id="consent-checkbox" required />
+            <span>Tôi đồng ý cho cửa hàng dùng thông tin này để giao hàng <span class="required">*</span></span>
+          </label>
+        </div>
+
+        <p id="form-error" class="form-error" role="alert" hidden></p>
+
+        <button type="submit" class="btn btn-primary btn-full">Xác nhận đặt hàng (COD)</button>
+      </form>
+    </div>
+  </aside>
+
+  <!-- Thông báo nhanh khi thêm vào giỏ -->
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+  <script src="products.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
