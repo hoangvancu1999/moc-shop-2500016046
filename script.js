@@ -1382,6 +1382,18 @@ document.addEventListener("DOMContentLoaded", async () => {
   });
 
   // Lọc Account & Dịch vụ
+  document.querySelectorAll(".universe-card[data-pick-game]").forEach((card) => {
+    card.addEventListener("click", () => {
+      const g = card.dataset.pickGame;
+      activeGame = g;
+      document.querySelectorAll(".tab-btn[data-game]").forEach((b) => {
+        b.classList.toggle("active", b.dataset.game === g);
+      });
+      renderAccounts();
+      document.getElementById("account-grid").scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+  });
+
   document.querySelectorAll(".tab-btn[data-game]").forEach((btn) => {
     btn.addEventListener("click", () => {
       document.querySelectorAll(".tab-btn[data-game]").forEach((b) => b.classList.remove("active"));

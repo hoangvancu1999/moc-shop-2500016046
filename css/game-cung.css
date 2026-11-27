@@ -179,9 +179,8 @@ body {
 .gc-hero {
   padding: 56px 0;
   background:
-    radial-gradient(circle at 12% 20%, rgba(16, 185, 129, 0.12), transparent 44%),
-    radial-gradient(circle at 86% 35%, rgba(6, 182, 212, 0.1), transparent 40%),
-    var(--bg);
+    linear-gradient(95deg, rgba(7, 10, 15, 0.94) 0%, rgba(7, 10, 15, 0.8) 55%, rgba(7, 10, 15, 0.92) 100%),
+    url("/images/banner-delta-force.jpg") center / cover no-repeat;
   border-bottom: 1px solid var(--border);
 }
 
