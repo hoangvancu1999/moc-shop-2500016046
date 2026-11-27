@@ -81,16 +81,29 @@ function renderAccounts() {
     .map(
       (acc) => `
       <article class="acc-card">
-        <div class="acc-banner" style="background: linear-gradient(135deg, ${acc.themeColor}, #111827);">
-          <div class="acc-banner-left">
-            <span class="acc-icon" aria-hidden="true">${acc.icon}</span>
-            <div>
-              <div class="acc-game-name">${acc.gameLabel}</div>
-              <span class="acc-code">#${acc.id}</span>
-            </div>
-          </div>
-          <span class="acc-status">${acc.badge}</span>
-        </div>
+        ${
+          acc.coverImage
+            ? `<div class="acc-cover-wrap">
+                 <img src="${acc.coverImage}" alt="${acc.title}" class="acc-cover-img" loading="lazy" />
+                 <div class="acc-cover-overlay">
+                   <div class="acc-cover-top">
+                     <span class="acc-code">#${acc.id}</span>
+                     <span class="acc-status">${acc.badge}</span>
+                   </div>
+                   <div class="acc-game-name">${acc.gameLabel}</div>
+                 </div>
+               </div>`
+            : `<div class="acc-banner" style="background: linear-gradient(135deg, ${acc.themeColor}, #111827);">
+                 <div class="acc-banner-left">
+                   <span class="acc-icon" aria-hidden="true">${acc.icon}</span>
+                   <div>
+                     <div class="acc-game-name">${acc.gameLabel}</div>
+                     <span class="acc-code">#${acc.id}</span>
+                   </div>
+                 </div>
+                 <span class="acc-status">${acc.badge}</span>
+               </div>`
+        }
 
         <div class="acc-body">
           <div class="acc-rank">${acc.rank}</div>
@@ -190,10 +203,23 @@ function openDetailModal(accId) {
   const acc = ACCOUNTS.find((a) => a.id === accId);
   if (!acc) return;
 
+  const images = Array.isArray(acc.gallery) && acc.gallery.length > 0
+    ? acc.gallery
+    : acc.coverImage
+    ? [acc.coverImage]
+    : [];
+
   document.getElementById("modal-code").textContent = `#${acc.id} • ${acc.gameLabel}`;
   document.getElementById("modal-body").innerHTML = `
     <h3 id="modal-title">${acc.title}</h3>
     <div class="acc-rank">Hạng / Cấp độ: ${acc.rank}</div>
+    ${
+      images.length > 0
+        ? `<div class="modal-gallery">
+             ${images.map((src, idx) => `<img src="${src}" alt="${acc.title} - ảnh ${idx + 1}" class="modal-gallery-img" />`).join("")}
+           </div>`
+        : ""
+    }
     <p class="service-desc">${acc.description}</p>
     <div class="acc-tags">
       ${acc.stats.map((st) => `<span class="acc-tag">${st}</span>`).join("")}
