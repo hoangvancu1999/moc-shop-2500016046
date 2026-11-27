@@ -940,8 +940,78 @@ body {
   color: var(--danger);
 }
 
+.header-user-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.member-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wallet-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background-color: var(--surface);
+  border: 1px solid var(--gold);
+  border-radius: 999px;
+  padding: 5px 12px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.wallet-user {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.wallet-balance {
+  font-weight: 900;
+  color: var(--gold);
+}
+
+.wallet-plus {
+  background-color: var(--gold);
+  color: #090b10;
+  font-weight: 800;
+  font-size: 0.75rem;
+  padding: 2px 7px;
+  border-radius: 999px;
+}
+
+.preset-amounts {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.preset-btn {
+  background-color: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 8px;
+  font-weight: 700;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.preset-btn.active,
+.preset-btn:hover {
+  border-color: var(--gold);
+  background-color: var(--gold-dim);
+  color: var(--gold);
+}
+
 .form-group input[type="text"],
 .form-group input[type="tel"],
+.form-group input[type="password"],
+.form-group input[type="number"],
 .form-group textarea {
   width: 100%;
   background-color: var(--surface);

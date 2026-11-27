@@ -14,13 +14,13 @@ service cloud.firestore {
       );
     }
 
-    // Collection đơn hàng cũ (giữ nguyên tương thích ngược)
+    // Collection đơn hàng cũ (giữ tương thích)
     match /donhang/{orderId} {
       allow create: if true;
       allow read, update, delete: if false;
     }
 
-    // Khóa xác thực Admin (cấm đọc công khai tuyệt đối)
+    // Khóa xác thực Admin
     match /gc_secrets/admin {
       allow create: if !exists(/databases/$(database)/documents/gc_secrets/admin) &&
                     request.resource.data.keyHash is string &&
@@ -31,7 +31,6 @@ service cloud.firestore {
       allow read, delete: if false;
     }
 
-    // Khóa công khai RSA-OAEP & khóa bí mật đã bọc AES-GCM
     match /gc_secrets/vault {
       allow get: if true;
       allow create: if !exists(/databases/$(database)/documents/gc_secrets/vault);
@@ -39,7 +38,6 @@ service cloud.firestore {
       allow list, delete: if false;
     }
 
-    // Dự phòng lưu thông tin riêng tư khi Admin chưa khởi tạo vault lần đầu
     match /gc_orders_private/{bookingCode} {
       allow create: if true;
       allow read, update, delete: if isAdminAuth();
@@ -50,28 +48,105 @@ service cloud.firestore {
       allow read, update, delete: if isAdminAuth();
     }
 
-    // Phiên đăng nhập Admin (cấm đọc/liệt kê công khai)
     match /gc_admin_sessions/{token} {
       allow create: if exists(/databases/$(database)/documents/gc_secrets/admin) &&
                     request.resource.data.keyHash == get(/databases/$(database)/documents/gc_secrets/admin).data.keyHash;
       allow read, update, delete: if false;
     }
 
-    // === KHO ACCOUNT & THANH TOÁN VIETQR GIAO ACC TRÊN WEB ===
+    // === HỆ THỐNG THÀNH VIÊN & VÍ SỐ DƯ (CHỐNG GIAN LẬN F12 TUYỆT ĐỐI) ===
+    match /users/{uid} {
+      // Thành viên đọc ví của mình; Admin xem danh sách thành viên để quản lý số dư
+      allow get: if (request.auth != null && request.auth.uid == uid) || isAdminAuth();
+      allow list: if true;
+
+      // Đăng ký mới: bắt buộc số dư khởi tạo bằng 0
+      allow create: if request.auth != null &&
+                    request.auth.uid == uid &&
+                    request.resource.data.balance == 0 &&
+                    request.resource.data.totalDeposited == 0;
+
+      // Cập nhật số dư:
+      // 1) Admin cộng/điều chỉnh số dư khi duyệt nạp tiền
+      // 2) Thành viên tự trừ tiền nguyên tử (writeBatch) đúng bằng giá Account chưa bán
+      allow update: if isAdminWrite() || (
+        request.auth != null &&
+        request.auth.uid == uid &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(["balance", "lastPurchasedAccId", "updatedAtISO"]) &&
+        request.resource.data.balance >= 0 &&
+        request.resource.data.balance < resource.data.balance &&
+        request.resource.data.lastPurchasedAccId is string &&
+        get(/databases/$(database)/documents/shop_accounts/$(request.resource.data.lastPurchasedAccId)).data.sold == false &&
+        getAfter(/databases/$(database)/documents/shop_accounts/$(request.resource.data.lastPurchasedAccId)).data.sold == true &&
+        getAfter(/databases/$(database)/documents/shop_accounts/$(request.resource.data.lastPurchasedAccId)).data.buyerUid == request.auth.uid &&
+        (resource.data.balance - request.resource.data.balance) ==
+          get(/databases/$(database)/documents/shop_accounts/$(request.resource.data.lastPurchasedAccId)).data.price
+      );
+      allow delete: if isAdminAuth();
+    }
+
+    // Yêu cầu nạp tiền qua VietQR MB Bank
+    match /wallet_topups/{topupCode} {
+      allow read: if true;
+      allow create: if request.auth != null &&
+                    request.resource.data.uid == request.auth.uid &&
+                    request.resource.data.status == "Pending" &&
+                    request.resource.data.amount is int &&
+                    request.resource.data.amount >= 10000;
+      allow update: if isAdminWrite() || (
+        request.auth != null &&
+        resource.data.uid == request.auth.uid &&
+        resource.data.status == "Pending" &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(["status"]) &&
+        request.resource.data.status == "Reported_Paid"
+      );
+      allow delete: if isAdminAuth();
+    }
+
+    // Lịch sử mua Account bằng số dư của từng thành viên
+    match /user_purchases/{purchaseId} {
+      allow read: if (request.auth != null && resource.data.uid == request.auth.uid) || isAdminAuth();
+      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if isAdminWrite();
+    }
+
+    // === KHO ACCOUNT & MỞ KHÓA TÀI KHOẢN / MẬT KHẨU TỰ ĐỘNG ===
     match /shop_accounts/{accId} {
       allow read: if true;
+      allow create: if isAdminWrite();
+      // Admin sửa kho HOẶC khách mua hợp lệ (đã trừ đủ tiền trong cùng giao dịch nguyên tử getAfter)
+      allow update: if isAdminWrite() || (
+        request.auth != null &&
+        resource.data.sold == false &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(["sold", "badge", "buyerUid", "soldAtISO"]) &&
+        request.resource.data.sold == true &&
+        request.resource.data.buyerUid == request.auth.uid &&
+        getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.balance >= 0 &&
+        getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.balance ==
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.balance - resource.data.price
+      );
+      allow delete: if isAdminAuth();
+    }
+
+    // Két mật khẩu phục vụ mở khóa TỨC THÌ 24/7 cho đúng người mua (CẤM list tuyệt đối!)
+    match /shop_account_secrets/{accId} {
+      allow get: if isAdminAuth() || (
+        request.auth != null &&
+        get(/databases/$(database)/documents/shop_accounts/$(accId)).data.sold == true &&
+        get(/databases/$(database)/documents/shop_accounts/$(accId)).data.buyerUid == request.auth.uid
+      );
+      allow list: if false;
       allow create, update: if isAdminWrite();
       allow delete: if isAdminAuth();
     }
 
-    // Két lưu Tài khoản + Mật khẩu game đã mã hóa RSA-OAEP (chỉ Admin có Private Key mới giải mã được)
+    // Két mã hóa RSA phục vụ hiển thị trong bảng Admin
     match /shop_vault_stock/{accId} {
       allow read: if true;
       allow create, update: if isAdminWrite();
       allow delete: if isAdminAuth();
     }
 
-    // Đơn mua Account / Dịch vụ thanh toán qua VietQR
     match /shop_orders/{maDon} {
       allow read: if true;
       allow create: if request.resource.data.paymentStatus == "Awaiting_Transfer" &&
@@ -85,7 +160,6 @@ service cloud.firestore {
       allow delete: if isAdminAuth();
     }
 
-    // Hộp bàn giao Tài khoản + Mật khẩu sau khi Admin xác nhận tiền về (CẤM list tuyệt đối!)
     match /shop_deliveries/{deliveryToken} {
       allow get: if true;
       allow list: if false;

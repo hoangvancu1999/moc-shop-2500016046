@@ -30,13 +30,30 @@
         <a href="#lien-he">Liên hệ</a>
       </nav>
 
-      <div style="display: flex; align-items: center; gap: 8px;">
-        <button type="button" id="open-my-orders-btn" class="btn btn-outline btn-sm" aria-label="Nhận Acc đã mua">
-          🔑 Nhận Acc
+      <div class="header-user-bar">
+        <!-- Khi chưa đăng nhập -->
+        <button type="button" id="open-auth-btn" class="btn btn-cyan btn-sm">
+          👤 Đăng nhập / Đăng ký
         </button>
+
+        <!-- Khi đã đăng nhập thành viên -->
+        <div id="member-bar" class="member-bar" hidden>
+          <div class="wallet-pill" id="open-topup-btn" role="button" tabindex="0" title="Bấm để nạp thêm tiền vào ví">
+            <span class="wallet-user" id="member-username">user</span>
+            <span class="wallet-balance" id="member-balance">0đ</span>
+            <span class="wallet-plus">+ Nạp</span>
+          </div>
+          <button type="button" id="open-bag-btn" class="btn btn-outline btn-sm">
+            🎒 Acc đã mua
+          </button>
+          <button type="button" id="member-logout-btn" class="btn btn-outline btn-sm" title="Đăng xuất">
+            Thoát
+          </button>
+        </div>
+
         <button type="button" id="open-cart-btn" class="cart-trigger" aria-label="Mở giỏ hàng">
           <span aria-hidden="true">🛒</span>
-          <span class="cart-text">Đơn hàng</span>
+          <span class="cart-text">Giỏ</span>
           <span id="cart-count" class="cart-badge">0</span>
         </button>
       </div>
@@ -368,25 +385,134 @@
     </div>
   </aside>
 
-  <!-- Modal Tra cứu & Nhận Acc đã mua -->
+  <!-- 1. Modal Đăng nhập / Đăng ký Tài khoản Thành viên -->
+  <div id="auth-overlay" class="overlay" hidden></div>
+  <div id="auth-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title" hidden>
+    <div class="modal-header">
+      <strong id="auth-modal-title" class="neon-cyan">👤 Tài Khoản Thành Viên HcuGaming</strong>
+      <button type="button" id="close-auth-btn" class="icon-close" aria-label="Đóng">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="filter-tabs" style="width: 100%; display: grid; grid-template-columns: 1fr 1fr;">
+        <button type="button" id="tab-login-mode" class="tab-btn active">Đăng nhập</button>
+        <button type="button" id="tab-register-mode" class="tab-btn">Đăng ký mới</button>
+      </div>
+
+      <form id="member-auth-form" style="display: grid; gap: 12px;">
+        <div class="form-group" style="margin: 0;">
+          <label for="m-username">Tên tài khoản (viết liền không dấu) <span class="req">*</span></label>
+          <input type="text" id="m-username" placeholder="Ví dụ: minhkhoi99" autocomplete="username" required />
+        </div>
+
+        <div class="form-group" style="margin: 0;">
+          <label for="m-password">Mật khẩu (tối thiểu 6 ký tự) <span class="req">*</span></label>
+          <input type="password" id="m-password" placeholder="Nhập mật khẩu..." autocomplete="current-password" required />
+        </div>
+
+        <div id="m-confirm-wrap" class="form-group" style="margin: 0;" hidden>
+          <label for="m-confirm">Nhập lại mật khẩu <span class="req">*</span></label>
+          <input type="password" id="m-confirm" placeholder="Xác nhận lại mật khẩu..." autocomplete="new-password" />
+        </div>
+
+        <p id="member-auth-error" class="form-error" style="margin: 0;" hidden></p>
+
+        <button type="submit" id="member-auth-submit" class="btn btn-cyan btn-full">
+          Đăng nhập vào Shop
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- 2. Modal Nạp Tiền Vào Tài Khoản (VietQR MB Bank 0911507170) -->
+  <div id="topup-overlay" class="overlay" hidden></div>
+  <div id="topup-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="topup-modal-title" hidden>
+    <div class="modal-header">
+      <strong id="topup-modal-title" class="neon-gold">💰 Nạp Tiền Vào Tài Khoản</strong>
+      <button type="button" id="close-topup-btn" class="icon-close" aria-label="Đóng">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="bank-info-card" style="display: flex; justify-content: space-between; align-items: center;">
+        <span>Số dư hiện tại của <strong id="topup-user-label" class="neon-cyan"></strong>:</span>
+        <strong id="topup-balance-label" class="neon-gold" style="font-size: 1.1rem;">0đ</strong>
+      </div>
+
+      <div id="topup-step-select" style="display: grid; gap: 12px;">
+        <label style="font-size: 0.88rem; font-weight: 700;">Chọn hoặc nhập số tiền muốn nạp (VNĐ):</label>
+        <div class="preset-amounts">
+          <button type="button" class="preset-btn" data-amt="20000">20.000đ</button>
+          <button type="button" class="preset-btn" data-amt="50000">50.000đ</button>
+          <button type="button" class="preset-btn" data-amt="100000">100.000đ</button>
+          <button type="button" class="preset-btn active" data-amt="200000">200.000đ</button>
+          <button type="button" class="preset-btn" data-amt="500000">500.000đ</button>
+          <button type="button" class="preset-btn" data-amt="1000000">1.000.000đ</button>
+        </div>
+
+        <div class="form-group" style="margin: 0;">
+          <input type="number" id="topup-amount-input" min="10000" step="1000" value="200000" style="width:100%; background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:8px; padding:10px 12px; font-size:1rem; font-weight:700;" />
+        </div>
+
+        <p id="topup-error" class="form-error" style="margin: 0;" hidden></p>
+        <button type="button" id="create-topup-qr-btn" class="btn btn-gold btn-full">
+          Tạo mã QR Nạp tiền ngay
+        </button>
+      </div>
+
+      <!-- Khối hiển thị mã VietQR Nạp tiền -->
+      <div id="topup-qr-view" class="vietqr-box" hidden>
+        <div class="qr-frame">
+          <img id="topup-qr-img" src="" alt="Mã VietQR Nạp tiền MB Bank HOANG VAN CU" class="vietqr-img" />
+        </div>
+        <div class="bank-info-card">
+          <div class="bank-row"><span>Ngân hàng:</span><strong>MB Bank (Quân Đội)</strong></div>
+          <div class="bank-row"><span>Số tài khoản:</span><strong>0911507170</strong></div>
+          <div class="bank-row"><span>Chủ tài khoản:</span><strong>HOANG VAN CU</strong></div>
+          <div class="bank-row"><span>Số tiền nạp:</span><strong id="topup-qr-amt" class="neon-gold">0đ</strong></div>
+          <div class="bank-row"><span>Nội dung CK bắt buộc:</span><strong id="topup-qr-memo" class="neon-cyan"></strong></div>
+        </div>
+        <p id="topup-live-note" style="font-size: 0.84rem; color: var(--text-muted); text-align: center;">
+          Quét mã QR để chuyển đúng nội dung. Ngay khi Admin xác nhận, tiền sẽ tự động cộng vào tài khoản của bạn!
+        </p>
+        <div style="display: flex; gap: 8px;">
+          <button type="button" id="topup-reported-btn" class="btn btn-cyan btn-full">✓ Tôi đã chuyển khoản</button>
+          <button type="button" id="topup-back-btn" class="btn btn-outline">Đổi mệnh giá</button>
+        </div>
+      </div>
+
+      <div style="border-top: 1px solid var(--border); padding-top: 10px;">
+        <div style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 6px;">Lịch sử nạp gần đây:</div>
+        <div id="topup-history-list" style="display: grid; gap: 6px; max-height: 140px; overflow-y: auto;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Modal Mua Account Trực Tiếp Bằng Số Dư Ví -->
+  <div id="buy-now-overlay" class="overlay" hidden></div>
+  <div id="buy-now-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="buy-now-title" hidden>
+    <div class="modal-header">
+      <strong id="buy-now-title" class="neon-cyan">⚡ Mua Account Bằng Số Dư Ví</strong>
+      <button type="button" id="close-buy-now-btn" class="icon-close" aria-label="Đóng">✕</button>
+    </div>
+    <div id="buy-now-body" class="modal-body"></div>
+  </div>
+
+  <!-- 4. Modal Kho Acc Đã Mua Của Thành Viên -->
   <div id="my-orders-overlay" class="overlay" hidden></div>
   <div id="my-orders-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="my-orders-title" hidden>
     <div class="modal-header">
-      <strong id="my-orders-title" class="neon-cyan">🔑 Nhận Acc &amp; Đơn Đã Mua Trên Web</strong>
+      <strong id="my-orders-title" class="neon-cyan">🎒 Kho Account Đã Mua Của Bạn</strong>
       <button type="button" id="close-my-orders-btn" class="icon-close" aria-label="Đóng">✕</button>
     </div>
     <div class="modal-body">
-      <div class="form-group">
-        <label for="claim-input">Nhập Mã bí mật nhận Acc (dạng <code>HCU-XXXXXX.xxxxxx</code>)</label>
-        <div style="display: flex; gap: 8px;">
-          <input type="text" id="claim-input" placeholder="Dán mã nhận acc của bạn..." style="flex: 1; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px;" />
-          <button type="button" id="claim-lookup-btn" class="btn btn-cyan btn-sm">Kiểm tra</button>
-        </div>
-      </div>
-      <div id="claim-lookup-result"></div>
+      <div id="purchased-accounts-list" class="delivered-list"></div>
       <div style="border-top: 1px solid var(--border); padding-top: 12px;">
-        <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 8px;">Các đơn đã đặt trên trình duyệt này:</div>
-        <div id="saved-receipts-list" style="display: grid; gap: 10px;"></div>
+        <label for="claim-input" style="font-size: 0.82rem; color: var(--text-muted); display:block; margin-bottom:6px;">
+          Tra cứu bằng mã biên lai lẻ (nếu đặt qua giỏ hàng không đăng nhập):
+        </label>
+        <div style="display: flex; gap: 8px;">
+          <input type="text" id="claim-input" placeholder="HCU-XXXXXX.xxxxxx" style="flex: 1; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px;" />
+          <button type="button" id="claim-lookup-btn" class="btn btn-outline btn-sm">Kiểm tra</button>
+        </div>
+        <div id="claim-lookup-result"></div>
       </div>
     </div>
   </div>

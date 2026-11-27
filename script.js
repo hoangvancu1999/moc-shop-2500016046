@@ -8,9 +8,19 @@ import {
   setDoc,
   addDoc,
   updateDoc,
+  writeBatch,
+  query,
+  where,
   onSnapshot,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
+import {
+  getAuth,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
 import { BANK_CONFIG, buildVietQrUrl } from "./js/bank-config.js";
 import { encryptCustomerPii, randomTokenHex } from "./js/gc-crypto.js";
 
@@ -25,9 +35,11 @@ const firebaseConfig = {
 
 const firebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp);
+const auth = getAuth(firebaseApp);
 
 const CART_KEY = "hcugaming_cart";
 const RECEIPTS_KEY = "hcugaming_receipts";
+const MEMBER_EMAIL_DOMAIN = "member.hcugaming.web.app";
 
 let activeGame = "all";
 let activePriceRange = "all";
@@ -40,8 +52,24 @@ let toastTimer = null;
 let activeOrderUnsub = null;
 let activeOrderMeta = null;
 
+// Trạng thái Thành viên & Ví số dư
+let authMode = "login"; // "login" | "register"
+let currentMember = null; // { uid, username, balance, totalDeposited }
+let memberDocUnsub = null;
+let activeTopupCode = null;
+let pendingBuyAccId = null;
+
 function formatVND(amount) {
   return `${Number(amount || 0).toLocaleString("vi-VN")}đ`;
+}
+
+function usernameToInternalEmail(username) {
+  return `${username.trim().toLowerCase()}@${MEMBER_EMAIL_DOMAIN}`;
+}
+
+function extractUsernameFromEmail(email) {
+  if (!email) return "user";
+  return email.split("@")[0];
 }
 
 function loadCart() {
@@ -58,7 +86,7 @@ function saveCart() {
   try {
     localStorage.setItem(CART_KEY, JSON.stringify(cart));
   } catch (e) {
-    // Bỏ qua nếu trình duyệt chặn
+    // Bỏ qua
   }
 }
 
@@ -89,7 +117,7 @@ function showToast(msg) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => {
     el.hidden = true;
-  }, 2400);
+  }, 2800);
 }
 
 async function syncRemoteAccountsAndVault() {
@@ -141,7 +169,7 @@ function updateTabCounts() {
     "lien-quan": `Liên Quân Mobile (${lqCount})`,
     "delta-force": `Delta Force (${dfCount})`
   };
-  document.querySelectorAll(".tab-btn").forEach((btn) => {
+  document.querySelectorAll(".tab-btn[data-game]").forEach((btn) => {
     if (gameLabels[btn.dataset.game]) {
       btn.textContent = gameLabels[btn.dataset.game];
     }
@@ -227,8 +255,8 @@ function renderAccounts() {
             <span class="acc-price">${formatVND(acc.price)}</span>
             <div class="acc-actions">
               <button type="button" class="btn btn-outline btn-sm detail-btn" data-id="${acc.id}">Chi tiết</button>
-              <button type="button" class="btn ${isSold ? "btn-outline" : "btn-cyan"} btn-sm add-btn" data-id="${acc.id}" ${isSold ? "disabled" : ""}>
-                ${isSold ? "Đã bán" : "Chọn mua"}
+              <button type="button" class="btn ${isSold ? "btn-outline" : "btn-cyan"} btn-sm buy-acc-btn" data-id="${acc.id}" ${isSold ? "disabled" : ""}>
+                ${isSold ? "Đã bán" : "⚡ Mua ngay"}
               </button>
             </div>
           </div>
@@ -281,6 +309,455 @@ function renderServices() {
     .join("");
 }
 
+// === ĐĂNG KÝ & ĐĂNG NHẬP THÀNH VIÊN + VÍ SỐ DƯ ===
+function openAuthModal(mode = "login") {
+  setAuthMode(mode);
+  document.getElementById("member-auth-error").hidden = true;
+  document.getElementById("auth-overlay").hidden = false;
+  document.getElementById("auth-modal").hidden = false;
+}
+
+function closeAuthModal() {
+  document.getElementById("auth-overlay").hidden = true;
+  document.getElementById("auth-modal").hidden = true;
+}
+
+function setAuthMode(mode) {
+  authMode = mode;
+  document.getElementById("tab-login-mode").classList.toggle("active", mode === "login");
+  document.getElementById("tab-register-mode").classList.toggle("active", mode === "register");
+  document.getElementById("m-confirm-wrap").hidden = mode === "login";
+  document.getElementById("member-auth-submit").textContent =
+    mode === "login" ? "Đăng nhập vào Shop" : "Tạo tài khoản mới";
+}
+
+function updateMemberHeaderUI() {
+  const guestBtn = document.getElementById("open-auth-btn");
+  const memberBar = document.getElementById("member-bar");
+
+  if (!currentMember) {
+    guestBtn.hidden = false;
+    memberBar.hidden = true;
+    return;
+  }
+
+  guestBtn.hidden = true;
+  memberBar.hidden = false;
+  document.getElementById("member-username").textContent = currentMember.username;
+  document.getElementById("member-balance").textContent = formatVND(currentMember.balance);
+  document.getElementById("topup-user-label").textContent = currentMember.username;
+  document.getElementById("topup-balance-label").textContent = formatVND(currentMember.balance);
+}
+
+async function handleMemberAuthSubmit(e) {
+  e.preventDefault();
+  const rawUser = document.getElementById("m-username").value.trim().toLowerCase();
+  const pass = document.getElementById("m-password").value;
+  const confirmPass = document.getElementById("m-confirm").value;
+  const errEl = document.getElementById("member-auth-error");
+  const submitBtn = document.getElementById("member-auth-submit");
+
+  errEl.hidden = true;
+
+  if (!/^[a-z0-9_]{4,24}$/.test(rawUser)) {
+    errEl.textContent = "Tên tài khoản chỉ gồm chữ thường, số hoặc dấu gạch dưới (4–24 ký tự).";
+    errEl.hidden = false;
+    return;
+  }
+  if (pass.length < 6) {
+    errEl.textContent = "Mật khẩu phải có ít nhất 6 ký tự.";
+    errEl.hidden = false;
+    return;
+  }
+  if (authMode === "register" && pass !== confirmPass) {
+    errEl.textContent = "Mật khẩu nhập lại không khớp.";
+    errEl.hidden = false;
+    return;
+  }
+
+  const email = usernameToInternalEmail(rawUser);
+  submitBtn.disabled = true;
+
+  try {
+    if (authMode === "register") {
+      const cred = await createUserWithEmailAndPassword(auth, email, pass);
+      await setDoc(doc(db, "users", cred.user.uid), {
+        uid: cred.user.uid,
+        username: rawUser,
+        balance: 0,
+        totalDeposited: 0,
+        createdAt: serverTimestamp(),
+        createdAtISO: new Date().toISOString()
+      });
+      showToast(`🎉 Tạo tài khoản "${rawUser}" thành công!`);
+    } else {
+      await signInWithEmailAndPassword(auth, email, pass);
+      showToast(`Chào mừng "${rawUser}" quay trở lại!`);
+    }
+    document.getElementById("member-auth-form").reset();
+    closeAuthModal();
+
+    if (pendingBuyAccId) {
+      const targetId = pendingBuyAccId;
+      pendingBuyAccId = null;
+      setTimeout(() => openBuyNowModal(targetId), 350);
+    }
+  } catch (err) {
+    console.error("Lỗi xác thực thành viên:", err);
+    if (err.code === "auth/email-already-in-use") {
+      errEl.textContent = "Tên tài khoản này đã có người sử dụng. Vui lòng chọn tên khác hoặc chuyển sang Đăng nhập.";
+    } else if (err.code === "auth/invalid-credential" || err.code === "auth/user-not-found" || err.code === "auth/wrong-password") {
+      errEl.textContent = "Sai tên tài khoản hoặc mật khẩu.";
+    } else if (err.code === "auth/configuration-not-found" || err.code === "auth/operation-not-allowed") {
+      errEl.textContent =
+        "Chủ shop cần bật phương thức đăng nhập 'Email/Password' trong Firebase Console (mục Authentication → Sign-in method) để kích hoạt tạo tài khoản.";
+    } else {
+      errEl.textContent = "Không thể đăng nhập lúc này, vui lòng thử lại.";
+    }
+    errEl.hidden = false;
+  } finally {
+    submitBtn.disabled = false;
+  }
+}
+
+// === NẠP TIỀN VÀO VÍ QUA VIETQR MB BANK ===
+async function openTopupModal(prefillAmount = null) {
+  if (!currentMember) {
+    openAuthModal("login");
+    showToast("Vui lòng đăng nhập tài khoản để nạp tiền vào ví!");
+    return;
+  }
+
+  if (prefillAmount && prefillAmount >= 10000) {
+    document.getElementById("topup-amount-input").value = prefillAmount;
+  }
+  document.getElementById("topup-step-select").hidden = false;
+  document.getElementById("topup-qr-view").hidden = true;
+  document.getElementById("topup-error").hidden = true;
+  document.getElementById("topup-overlay").hidden = false;
+  document.getElementById("topup-modal").hidden = false;
+  await loadMemberTopupHistory();
+}
+
+function closeTopupModal() {
+  document.getElementById("topup-overlay").hidden = true;
+  document.getElementById("topup-modal").hidden = true;
+}
+
+async function handleCreateTopupQr() {
+  if (!currentMember) return;
+  const errEl = document.getElementById("topup-error");
+  const amount = Math.round(Number(document.getElementById("topup-amount-input").value || 0));
+  errEl.hidden = true;
+
+  if (amount < 10000) {
+    errEl.textContent = "Số tiền nạp tối thiểu là 10.000đ.";
+    errEl.hidden = false;
+    return;
+  }
+
+  const btn = document.getElementById("create-topup-qr-btn");
+  btn.disabled = true;
+
+  try {
+    const topupCode = `NAP${Math.floor(100000 + Math.random() * 900000)}`;
+    await setDoc(doc(db, "wallet_topups", topupCode), {
+      topupCode,
+      uid: currentMember.uid,
+      username: currentMember.username,
+      amount,
+      status: "Pending",
+      createdAt: serverTimestamp(),
+      createdAtISO: new Date().toISOString()
+    });
+
+    activeTopupCode = topupCode;
+    document.getElementById("topup-qr-img").src = buildVietQrUrl(amount, topupCode);
+    document.getElementById("topup-qr-amt").textContent = formatVND(amount);
+    document.getElementById("topup-qr-memo").textContent = topupCode;
+
+    const repBtn = document.getElementById("topup-reported-btn");
+    repBtn.disabled = false;
+    repBtn.textContent = "✓ Tôi đã chuyển khoản";
+
+    document.getElementById("topup-step-select").hidden = true;
+    document.getElementById("topup-qr-view").hidden = false;
+    await loadMemberTopupHistory();
+  } catch (err) {
+    console.error("Lỗi tạo lệnh nạp:", err);
+    errEl.textContent = "Không thể tạo mã nạp lúc này, vui lòng thử lại.";
+    errEl.hidden = false;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function handleTopupReportedPaid() {
+  if (!activeTopupCode) return;
+  const repBtn = document.getElementById("topup-reported-btn");
+  repBtn.disabled = true;
+  try {
+    await updateDoc(doc(db, "wallet_topups", activeTopupCode), { status: "Reported_Paid" });
+    repBtn.textContent = "Đã báo Admin – Chờ cộng tiền...";
+    showToast("Đã gửi thông báo nạp tiền! Số dư sẽ tự động cộng ngay khi Admin duyệt.");
+    await loadMemberTopupHistory();
+  } catch (err) {
+    repBtn.disabled = false;
+  }
+}
+
+async function loadMemberTopupHistory() {
+  if (!currentMember) return;
+  const listEl = document.getElementById("topup-history-list");
+  try {
+    const q = query(collection(db, "wallet_topups"), where("uid", "==", currentMember.uid));
+    const snap = await getDocs(q);
+    const rows = [];
+    snap.forEach((d) => rows.push(d.data()));
+    rows.sort((a, b) => String(b.createdAtISO || "").localeCompare(String(a.createdAtISO || "")));
+
+    if (rows.length === 0) {
+      listEl.innerHTML = `<span style="font-size: 0.8rem; color: var(--text-muted);">Chưa có giao dịch nạp nào.</span>`;
+      return;
+    }
+
+    listEl.innerHTML = rows
+      .slice(0, 6)
+      .map((r) => {
+        const stLabel =
+          r.status === "Approved"
+            ? `<span style="color: var(--success); font-weight:700;">✓ Đã cộng</span>`
+            : r.status === "Reported_Paid"
+            ? `<span style="color: var(--gold);">⏳ Chờ duyệt</span>`
+            : r.status === "Rejected"
+            ? `<span style="color: var(--danger);">Đã hủy</span>`
+            : `<span style="color: var(--text-muted);">Chờ CK</span>`;
+        return `<div class="bank-row" style="font-size: 0.82rem; border-bottom: 1px solid var(--border); padding-bottom: 4px;">
+          <span><strong>${r.topupCode}</strong> (${formatVND(r.amount)})</span>
+          ${stLabel}
+        </div>`;
+      })
+      .join("");
+  } catch (e) {
+    listEl.innerHTML = "";
+  }
+}
+
+// === MUA ACCOUNT TỰ ĐỘNG TRỪ SỐ DƯ VÍ & MỞ KHÓA ACC TỨC THÌ ===
+async function openBuyNowModal(accId) {
+  await syncRemoteAccountsAndVault();
+  const acc = catalogAccounts.find((a) => a.id === accId);
+  if (!acc) return;
+
+  if (acc.sold) {
+    showToast("Tài khoản này vừa được bán!");
+    renderAccounts();
+    return;
+  }
+
+  if (!currentMember) {
+    pendingBuyAccId = accId;
+    openAuthModal("login");
+    showToast("Hãy đăng nhập (hoặc đăng ký nhanh) để mua Acc bằng số dư ví!");
+    return;
+  }
+
+  const bodyEl = document.getElementById("buy-now-body");
+  const enough = currentMember.balance >= acc.price;
+  const missing = Math.max(10000, acc.price - currentMember.balance);
+
+  bodyEl.innerHTML = `
+    <div class="bank-info-card">
+      <div class="bank-row"><span>Mã Account:</span><strong class="neon-cyan">#${acc.id} (${acc.gameLabel})</strong></div>
+      <div style="font-weight: 700; margin: 4px 0;">${acc.title}</div>
+      <div class="bank-row"><span>Giá niêm yết:</span><strong class="neon-gold">${formatVND(acc.price)}</strong></div>
+      <div class="bank-row"><span>Số dư ví của bạn:</span><strong>${formatVND(currentMember.balance)}</strong></div>
+      ${
+        enough
+          ? `<div class="bank-row" style="border-top:1px dashed var(--border); padding-top:6px;">
+               <span>Số dư còn lại sau mua:</span>
+               <strong style="color: var(--success);">${formatVND(currentMember.balance - acc.price)}</strong>
+             </div>`
+          : `<div style="color: var(--danger); font-weight:700; margin-top:4px;">
+               ⚠️ Số dư ví chưa đủ (cần nạp thêm ${formatVND(acc.price - currentMember.balance)}).
+             </div>`
+      }
+    </div>
+    <p id="buy-now-error" class="form-error" style="margin:0;" hidden></p>
+    ${
+      enough
+        ? `<button type="button" id="confirm-wallet-buy-btn" class="btn btn-cyan btn-full">
+             ⚡ Thanh toán ${formatVND(acc.price)} &amp; Nhận Tài Khoản Ngay
+           </button>`
+        : `<button type="button" id="go-topup-shortfall-btn" class="btn btn-gold btn-full">
+             💰 Nạp thêm ${formatVND(missing)} qua VietQR ngay
+           </button>`
+    }
+  `;
+
+  document.getElementById("buy-now-overlay").hidden = false;
+  document.getElementById("buy-now-modal").hidden = false;
+
+  if (enough) {
+    document.getElementById("confirm-wallet-buy-btn").addEventListener("click", () => {
+      executeAtomicWalletPurchase(acc);
+    });
+  } else {
+    document.getElementById("go-topup-shortfall-btn").addEventListener("click", () => {
+      closeBuyNowModal();
+      openTopupModal(missing);
+    });
+  }
+}
+
+function closeBuyNowModal() {
+  document.getElementById("buy-now-overlay").hidden = true;
+  document.getElementById("buy-now-modal").hidden = true;
+}
+
+async function executeAtomicWalletPurchase(acc) {
+  const btn = document.getElementById("confirm-wallet-buy-btn");
+  const errEl = document.getElementById("buy-now-error");
+  btn.disabled = true;
+  btn.textContent = "Đang trừ số dư & mở khóa tài khoản...";
+  errEl.hidden = true;
+
+  try {
+    // Đảm bảo bản ghi shop_accounts/{acc.id} đã tồn tại trên Firestore trước khi chạy batch
+    const accRef = doc(db, "shop_accounts", acc.id);
+    const accSnap = await getDoc(accRef);
+    if (!accSnap.exists()) {
+      throw new Error("MISSING_CLOUD_STOCK");
+    }
+    if (accSnap.data().sold) {
+      throw new Error("ALREADY_SOLD");
+    }
+
+    const userRef = doc(db, "users", currentMember.uid);
+    const userSnap = await getDoc(userRef);
+    const liveBalance = Number(userSnap.data()?.balance || 0);
+    const price = Number(accSnap.data().price || acc.price);
+
+    if (liveBalance < price) {
+      throw new Error("INSUFFICIENT_BALANCE");
+    }
+
+    const purchaseId = `PUR-${Date.now()}-${acc.id}`;
+    const batch = writeBatch(db);
+
+    batch.update(userRef, {
+      balance: liveBalance - price,
+      lastPurchasedAccId: acc.id,
+      updatedAtISO: new Date().toISOString()
+    });
+
+    batch.update(accRef, {
+      sold: true,
+      badge: "ĐÃ BÁN",
+      buyerUid: currentMember.uid,
+      soldAtISO: new Date().toISOString()
+    });
+
+    batch.set(doc(db, "user_purchases", purchaseId), {
+      purchaseId,
+      uid: currentMember.uid,
+      username: currentMember.username,
+      accId: acc.id,
+      title: acc.title,
+      price,
+      createdAtISO: new Date().toISOString()
+    });
+
+    await batch.commit();
+
+    // Đọc ngay Tài khoản + Mật khẩu từ két shop_account_secrets/{acc.id}
+    let secretData = {
+      loginUser: "Liên hệ Admin Zalo 0911507170 để nhận ngay (Chủ shop chưa gắn mật khẩu sẵn)",
+      loginPass: "—",
+      guideNote: "Đơn mua bằng số dư đã được ghi nhận thành công!"
+    };
+    const secretSnap = await getDoc(doc(db, "shop_account_secrets", acc.id));
+    if (secretSnap.exists()) {
+      secretData = secretSnap.data();
+    }
+
+    await syncRemoteAccountsAndVault();
+    updateTabCounts();
+    renderAccounts();
+
+    document.getElementById("buy-now-body").innerHTML = `
+      <div class="success-badge">🎉 MUA THÀNH CÔNG – TÀI KHOẢN ĐÃ MỞ KHÓA!</div>
+      <div class="delivered-list">
+        ${renderDeliveredCredentialsHTML([
+          {
+            id: acc.id,
+            title: acc.title,
+            loginUser: secretData.loginUser,
+            loginPass: secretData.loginPass,
+            guideNote: secretData.guideNote
+          }
+        ])}
+      </div>
+      <p style="font-size: 0.84rem; color: var(--gold);">
+        📌 Tài khoản này cũng đã được lưu vĩnh viễn trong mục <strong>"🎒 Acc đã mua"</strong> của bạn!
+      </p>
+    `;
+  } catch (err) {
+    console.error("Lỗi mua bằng số dư:", err);
+    if (err.message === "ALREADY_SOLD") {
+      errEl.textContent = "Rất tiếc, tài khoản này vừa có người khác mua trước 1 giây.";
+    } else if (err.message === "MISSING_CLOUD_STOCK") {
+      errEl.textContent = "Tài khoản này đang chờ Admin đồng bộ kho lần đầu trong trang /admin.";
+    } else {
+      errEl.textContent = "Không thể hoàn tất giao dịch, vui lòng kiểm tra lại số dư và thử lại.";
+    }
+    errEl.hidden = false;
+    btn.disabled = false;
+    btn.textContent = `⚡ Thanh toán ${formatVND(acc.price)} & Nhận Tài Khoản Ngay`;
+  }
+}
+
+async function loadPurchasedBagModal() {
+  const listEl = document.getElementById("purchased-accounts-list");
+  if (!currentMember) {
+    listEl.innerHTML = `<div style="font-size: 0.88rem; color: var(--text-muted);">Hãy đăng nhập tài khoản để xem các Account bạn đã mua.</div>`;
+    return;
+  }
+
+  listEl.innerHTML = `<div style="font-size: 0.85rem; color: var(--text-muted);">Đang tải kho Acc đã mua của ${currentMember.username}...</div>`;
+  try {
+    const q = query(collection(db, "user_purchases"), where("uid", "==", currentMember.uid));
+    const snap = await getDocs(q);
+    if (snap.empty) {
+      listEl.innerHTML = `<div style="font-size: 0.88rem; color: var(--text-muted);">Bạn chưa mua Account nào bằng tài khoản <strong>${currentMember.username}</strong>.</div>`;
+      return;
+    }
+
+    const items = [];
+    for (const d of snap.docs) {
+      const pur = d.data();
+      let sec = { loginUser: "Liên hệ Zalo 0911507170", loginPass: "—", guideNote: "" };
+      try {
+        const sSnap = await getDoc(doc(db, "shop_account_secrets", pur.accId));
+        if (sSnap.exists()) sec = sSnap.data();
+      } catch (e) {
+        // Bỏ qua
+      }
+      items.push({
+        id: pur.accId,
+        title: pur.title,
+        loginUser: sec.loginUser,
+        loginPass: sec.loginPass,
+        guideNote: sec.guideNote
+      });
+    }
+
+    listEl.innerHTML = renderDeliveredCredentialsHTML(items);
+  } catch (err) {
+    listEl.innerHTML = `<div class="form-error">Không thể tải danh sách lúc này.</div>`;
+  }
+}
+
 function openDetailModal(accId) {
   const acc = catalogAccounts.find((a) => a.id === accId);
   if (!acc) return;
@@ -310,8 +787,8 @@ function openDetailModal(accId) {
     </div>
     <div class="acc-footer">
       <span class="acc-price">${formatVND(acc.price)}</span>
-      <button type="button" class="btn btn-cyan" id="modal-add-btn" data-id="${acc.id}" ${isSold ? "disabled" : ""}>
-        ${isSold ? "Tài khoản đã bán" : "Mua ngay (VietQR)"}
+      <button type="button" class="btn btn-cyan" id="modal-buy-btn" data-id="${acc.id}" ${isSold ? "disabled" : ""}>
+        ${isSold ? "Tài khoản đã bán" : "⚡ Mua ngay bằng Số dư"}
       </button>
     </div>
   `;
@@ -320,10 +797,9 @@ function openDetailModal(accId) {
   document.getElementById("detail-modal").hidden = false;
 
   if (!isSold) {
-    document.getElementById("modal-add-btn").addEventListener("click", () => {
-      addToCart(acc.id);
+    document.getElementById("modal-buy-btn").addEventListener("click", () => {
       closeDetailModal();
-      openCart();
+      openBuyNowModal(acc.id);
     });
   }
 }
@@ -333,6 +809,7 @@ function closeDetailModal() {
   document.getElementById("detail-modal").hidden = true;
 }
 
+// === GIỎ HÀNG DỊCH VỤ & ĐẶT ĐƠN VIETQR LẺ ===
 function addToCart(itemId) {
   const item = findCatalogItem(itemId);
   if (!item) return;
@@ -344,7 +821,7 @@ function addToCart(itemId) {
   const existing = cart.find((c) => c.id === itemId);
   if (existing) {
     if (item.type === "account") {
-      showToast(`Mã acc #${item.id} đã có trong đơn hàng`);
+      showToast(`Mã acc #${item.id} đã có trong giỏ`);
       return;
     }
     existing.qty += 1;
@@ -354,7 +831,7 @@ function addToCart(itemId) {
 
   saveCart();
   renderCart();
-  showToast(`Đã thêm "${item.title}" vào đơn hàng`);
+  showToast(`Đã thêm "${item.title}" vào giỏ`);
 }
 
 function updateCartQty(itemId, delta) {
@@ -367,7 +844,7 @@ function updateCartQty(itemId, delta) {
   if (nextQty <= 0) {
     cart.splice(index, 1);
   } else if (item && item.type === "account" && nextQty > 1) {
-    showToast("Mỗi tài khoản game là duy nhất (số lượng tối đa 1)");
+    showToast("Mỗi tài khoản game là duy nhất (tối đa 1)");
     return;
   } else {
     cart[index].qty = nextQty;
@@ -459,7 +936,7 @@ function closeCart() {
 
 function renderDeliveredCredentialsHTML(items) {
   if (!Array.isArray(items) || items.length === 0) {
-    return `<div class="cred-card">Đơn hàng đã xác nhận thanh toán! Admin đang gửi thông tin chi tiết cho bạn.</div>`;
+    return `<div class="cred-card">Đơn hàng đã xác nhận thanh toán!</div>`;
   }
   return items
     .map(
@@ -470,7 +947,7 @@ function renderDeliveredCredentialsHTML(items) {
         <div class="cred-line"><span>${it.loginUser || "—"}</span></div>
         <div>Mật khẩu:</div>
         <div class="cred-line"><span>${it.loginPass || "—"}</span></div>
-        ${it.guideNote ? `<div style="font-size: 0.82rem; color: var(--text-muted);">📌 Hướng dẫn: ${it.guideNote}</div>` : ""}
+        ${it.guideNote ? `<div style="font-size: 0.82rem; color: var(--text-muted);">📌 ${it.guideNote}</div>` : ""}
       </div>
     `
     )
@@ -488,7 +965,7 @@ function watchOrderPaymentAndDelivery(maDon, deliveryToken) {
 
     if (data.paymentStatus === "Customer_Marked_Paid") {
       statusTextEl.innerHTML =
-        "⏳ <strong>Đã báo chuyển khoản!</strong> Hệ thống đang chờ Admin xác nhận biến động số dư — giữ nguyên màn hình này để nhận Acc tự động.";
+        "⏳ <strong>Đã báo chuyển khoản!</strong> Chờ Admin xác nhận biến động số dư — giữ màn hình này để nhận Acc tự động.";
       markBtn.disabled = true;
       markBtn.textContent = "Đã gửi thông báo chuyển khoản";
     } else if (data.paymentStatus === "Paid_Delivered") {
@@ -551,11 +1028,6 @@ async function handleOrderSubmit(e) {
   for (const entry of cart) {
     const item = findCatalogItem(entry.id);
     if (!item) continue;
-    if (item.type === "account" && item.sold) {
-      errEl.textContent = `Tài khoản #${item.id} vừa có người mua trước. Vui lòng chọn tài khoản khác.`;
-      errEl.hidden = false;
-      return;
-    }
     const lineTotal = item.price * entry.qty;
     totalQty += entry.qty;
     grandTotal += lineTotal;
@@ -574,7 +1046,6 @@ async function handleOrderSubmit(e) {
   submitBtn.textContent = "Đang tạo mã VietQR thanh toán...";
 
   try {
-    // Tải lại khóa công khai mới nhất nếu có
     if (!publicKeyJwk) {
       const vSnap = await getDoc(doc(db, "gc_secrets", "vault"));
       if (vSnap.exists() && vSnap.data().publicKeyJwk) {
@@ -602,7 +1073,6 @@ async function handleOrderSubmit(e) {
       });
     }
 
-    // Lưu vào shop_orders (phục vụ VietQR & mở khóa Acc tự động) và donhang (lịch sử đơn)
     await setDoc(doc(db, "shop_orders", code), {
       maDon: code,
       transferCode,
@@ -644,7 +1114,6 @@ async function handleOrderSubmit(e) {
 
     activeOrderMeta = { maDon: code, deliveryToken };
 
-    // Hiển thị VietQR MB Bank HOANG VAN CU
     document.getElementById("order-code").textContent = code;
     document.getElementById("vietqr-img").src = buildVietQrUrl(grandTotal, transferCode);
     document.getElementById("qr-amount").textContent = formatVND(grandTotal);
@@ -667,8 +1136,7 @@ async function handleOrderSubmit(e) {
     watchOrderPaymentAndDelivery(code, deliveryToken);
   } catch (err) {
     console.error("Lỗi tạo đơn VietQR:", err);
-    errEl.textContent =
-      "Không thể khởi tạo đơn hàng lúc này. Vui lòng kiểm tra mạng và thử lại (hoặc nhắn Zalo 0911507170).";
+    errEl.textContent = "Không thể khởi tạo đơn hàng lúc này, vui lòng thử lại.";
     errEl.hidden = false;
   } finally {
     submitBtn.disabled = false;
@@ -676,26 +1144,10 @@ async function handleOrderSubmit(e) {
   }
 }
 
-async function handleMarkPaidClick() {
-  if (!activeOrderMeta) return;
-  const btn = document.getElementById("mark-paid-btn");
-  btn.disabled = true;
-  try {
-    await updateDoc(doc(db, "shop_orders", activeOrderMeta.maDon), {
-      paymentStatus: "Customer_Marked_Paid"
-    });
-    showToast("Đã gửi thông báo chuyển khoản tới Admin!");
-  } catch (err) {
-    btn.disabled = false;
-    showToast("Đơn hàng đã được cập nhật trạng thái trước đó.");
-  }
-}
-
-// Tra cứu & Nhận Acc đã mua
 async function checkClaimReceipt(rawInput, targetEl) {
   const parts = String(rawInput || "").trim().split(".");
   if (parts.length !== 2 || !parts[0] || !parts[1]) {
-    targetEl.innerHTML = `<div class="form-error">Mã nhận Acc không đúng định dạng (cần dạng <code>HCU-XXXXXX.xxxxxx</code>).</div>`;
+    targetEl.innerHTML = `<div class="form-error">Mã biên lai cần dạng <code>HCU-XXXXXX.xxxxxx</code>.</div>`;
     return;
   }
   const [maDon, token] = parts;
@@ -718,48 +1170,13 @@ async function checkClaimReceipt(rawInput, targetEl) {
         delivSnap.data().items
       )}</div>`;
     } else {
-      const qrUrl = buildVietQrUrl(ord.tongTien, ord.transferCode);
-      targetEl.innerHTML = `
-        <div class="bank-info-card" style="margin: 10px 0;">
-          <div>Đơn <strong>${maDon}</strong> đang ở trạng thái: <strong class="neon-gold">${
-        ord.paymentStatus === "Customer_Marked_Paid" ? "Chờ Admin xác nhận tiền về" : "Chờ chuyển khoản"
-      }</strong></div>
-          <div>Số tiền: <strong>${formatVND(ord.tongTien)}</strong> • Nội dung CK: <strong class="neon-cyan">${
-        ord.transferCode
-      }</strong> (MB Bank 0911507170 - HOANG VAN CU)</div>
-          <img src="${qrUrl}" alt="VietQR" style="width: 180px; border-radius: 8px; margin-top: 6px; background:#fff; padding:6px;" />
-        </div>
-      `;
+      targetEl.innerHTML = `<div style="font-size: 0.85rem; color: var(--gold); margin-top:6px;">Đơn ${maDon} đang chờ xác nhận chuyển khoản (${formatVND(
+        ord.tongTien
+      )} - Nội dung: ${ord.transferCode}).</div>`;
     }
   } catch (err) {
-    targetEl.innerHTML = `<div class="form-error">Không thể kiểm tra lúc này, vui lòng thử lại.</div>`;
+    targetEl.innerHTML = `<div class="form-error">Không thể kiểm tra lúc này.</div>`;
   }
-}
-
-function renderSavedReceiptsModal() {
-  const listEl = document.getElementById("saved-receipts-list");
-  const receipts = loadSavedReceipts();
-  if (receipts.length === 0) {
-    listEl.innerHTML = `<div style="font-size: 0.85rem; color: var(--text-muted);">Chưa có đơn hàng nào lưu trên trình duyệt này.</div>`;
-    return;
-  }
-
-  listEl.innerHTML = receipts
-    .map(
-      (r) => `
-      <div class="bank-info-card">
-        <div class="bank-row">
-          <strong class="neon-cyan">${r.maDon}</strong>
-          <strong>${formatVND(r.tongTien)}</strong>
-        </div>
-        <div style="font-size: 0.8rem; color: var(--text-muted);">${r.summary || ""}</div>
-        <button type="button" class="btn btn-outline btn-sm view-saved-receipt-btn" data-receipt="${r.receiptCode}" style="margin-top:4px;">
-          Xem trạng thái / Nhận Acc
-        </button>
-      </div>
-    `
-    )
-    .join("");
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -775,9 +1192,56 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderServices();
   renderCart();
 
-  document.querySelectorAll(".tab-btn").forEach((btn) => {
+  // Theo dõi trạng thái đăng nhập thành viên & lắng nghe số dư thời gian thực
+  onAuthStateChanged(auth, async (user) => {
+    if (memberDocUnsub) {
+      memberDocUnsub();
+      memberDocUnsub = null;
+    }
+
+    if (!user) {
+      currentMember = null;
+      updateMemberHeaderUI();
+      return;
+    }
+
+    const fallbackUsername = extractUsernameFromEmail(user.email);
+    const userRef = doc(db, "users", user.uid);
+    let prevBalance = null;
+
+    memberDocUnsub = onSnapshot(userRef, async (snap) => {
+      if (!snap.exists()) {
+        await setDoc(userRef, {
+          uid: user.uid,
+          username: fallbackUsername,
+          balance: 0,
+          totalDeposited: 0,
+          createdAt: serverTimestamp(),
+          createdAtISO: new Date().toISOString()
+        });
+        return;
+      }
+      const data = snap.data();
+      const nextBalance = Number(data.balance || 0);
+      if (prevBalance !== null && nextBalance > prevBalance) {
+        showToast(`🎉 Tài khoản của bạn vừa được cộng +${formatVND(nextBalance - prevBalance)}!`);
+      }
+      prevBalance = nextBalance;
+
+      currentMember = {
+        uid: user.uid,
+        username: data.username || fallbackUsername,
+        balance: nextBalance,
+        totalDeposited: Number(data.totalDeposited || 0)
+      };
+      updateMemberHeaderUI();
+    });
+  });
+
+  // Lọc Account & Dịch vụ
+  document.querySelectorAll(".tab-btn[data-game]").forEach((btn) => {
     btn.addEventListener("click", () => {
-      document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
+      document.querySelectorAll(".tab-btn[data-game]").forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
       activeGame = btn.dataset.game;
       renderAccounts();
@@ -809,17 +1273,15 @@ document.addEventListener("DOMContentLoaded", async () => {
       openDetailModal(detailBtn.dataset.id);
       return;
     }
-    const addBtn = e.target.closest(".add-btn");
-    if (addBtn) {
-      addToCart(addBtn.dataset.id);
+    const buyBtn = e.target.closest(".buy-acc-btn");
+    if (buyBtn) {
+      openBuyNowModal(buyBtn.dataset.id);
     }
   });
 
   document.getElementById("service-grid").addEventListener("click", (e) => {
     const addBtn = e.target.closest(".add-btn");
-    if (addBtn) {
-      addToCart(addBtn.dataset.id);
-    }
+    if (addBtn) addToCart(addBtn.dataset.id);
   });
 
   document.getElementById("cart-items").addEventListener("click", (e) => {
@@ -831,6 +1293,41 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (action === "remove") removeCartItem(id);
   });
 
+  // Sự kiện Auth Modal
+  document.getElementById("open-auth-btn").addEventListener("click", () => openAuthModal("login"));
+  document.getElementById("close-auth-btn").addEventListener("click", closeAuthModal);
+  document.getElementById("auth-overlay").addEventListener("click", closeAuthModal);
+  document.getElementById("tab-login-mode").addEventListener("click", () => setAuthMode("login"));
+  document.getElementById("tab-register-mode").addEventListener("click", () => setAuthMode("register"));
+  document.getElementById("member-auth-form").addEventListener("submit", handleMemberAuthSubmit);
+  document.getElementById("member-logout-btn").addEventListener("click", async () => {
+    await signOut(auth);
+    showToast("Đã đăng xuất tài khoản.");
+  });
+
+  // Sự kiện Nạp tiền Modal
+  document.getElementById("open-topup-btn").addEventListener("click", () => openTopupModal());
+  document.getElementById("close-topup-btn").addEventListener("click", closeTopupModal);
+  document.getElementById("topup-overlay").addEventListener("click", closeTopupModal);
+  document.querySelectorAll(".preset-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".preset-btn").forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      document.getElementById("topup-amount-input").value = btn.dataset.amt;
+    });
+  });
+  document.getElementById("create-topup-qr-btn").addEventListener("click", handleCreateTopupQr);
+  document.getElementById("topup-reported-btn").addEventListener("click", handleTopupReportedPaid);
+  document.getElementById("topup-back-btn").addEventListener("click", () => {
+    document.getElementById("topup-qr-view").hidden = true;
+    document.getElementById("topup-step-select").hidden = false;
+  });
+
+  // Sự kiện Mua ngay Modal
+  document.getElementById("close-buy-now-btn").addEventListener("click", closeBuyNowModal);
+  document.getElementById("buy-now-overlay").addEventListener("click", closeBuyNowModal);
+
+  // Sự kiện Chi tiết & Giỏ hàng
   document.getElementById("close-detail-btn").addEventListener("click", closeDetailModal);
   document.getElementById("detail-overlay").addEventListener("click", closeDetailModal);
   document.getElementById("open-cart-btn").addEventListener("click", openCart);
@@ -838,35 +1335,38 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("cart-overlay").addEventListener("click", closeCart);
   document.getElementById("continue-btn").addEventListener("click", closeCart);
   document.getElementById("order-form").addEventListener("submit", handleOrderSubmit);
-  document.getElementById("mark-paid-btn").addEventListener("click", handleMarkPaidClick);
+  document.getElementById("mark-paid-btn").addEventListener("click", async () => {
+    if (!activeOrderMeta) return;
+    const btn = document.getElementById("mark-paid-btn");
+    btn.disabled = true;
+    try {
+      await updateDoc(doc(db, "shop_orders", activeOrderMeta.maDon), {
+        paymentStatus: "Customer_Marked_Paid"
+      });
+      showToast("Đã gửi thông báo chuyển khoản tới Admin!");
+    } catch (e) {
+      btn.disabled = false;
+    }
+  });
 
-  // Modal Nhận Acc
-  const openMyOrders = () => {
-    renderSavedReceiptsModal();
+  // Kho Acc đã mua
+  const openBag = async () => {
     document.getElementById("claim-lookup-result").innerHTML = "";
     document.getElementById("my-orders-overlay").hidden = false;
     document.getElementById("my-orders-modal").hidden = false;
+    await loadPurchasedBagModal();
   };
-  const closeMyOrders = () => {
+  const closeBag = () => {
     document.getElementById("my-orders-overlay").hidden = true;
     document.getElementById("my-orders-modal").hidden = true;
   };
-
-  document.getElementById("open-my-orders-btn").addEventListener("click", openMyOrders);
-  document.getElementById("close-my-orders-btn").addEventListener("click", closeMyOrders);
-  document.getElementById("my-orders-overlay").addEventListener("click", closeMyOrders);
-
+  document.getElementById("open-bag-btn").addEventListener("click", openBag);
+  document.getElementById("close-my-orders-btn").addEventListener("click", closeBag);
+  document.getElementById("my-orders-overlay").addEventListener("click", closeBag);
   document.getElementById("claim-lookup-btn").addEventListener("click", () => {
     checkClaimReceipt(
       document.getElementById("claim-input").value,
       document.getElementById("claim-lookup-result")
     );
-  });
-
-  document.getElementById("saved-receipts-list").addEventListener("click", (e) => {
-    const btn = e.target.closest(".view-saved-receipt-btn");
-    if (!btn) return;
-    document.getElementById("claim-input").value = btn.dataset.receipt;
-    checkClaimReceipt(btn.dataset.receipt, document.getElementById("claim-lookup-result"));
   });
 });
