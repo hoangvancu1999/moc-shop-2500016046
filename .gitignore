@@ -7,3 +7,6 @@ desktop.ini
 .env.local
 .vercel
 *.log
+
+.vercel
+.env*
