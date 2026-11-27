@@ -393,20 +393,31 @@
       <button type="button" id="close-auth-btn" class="icon-close" aria-label="Đóng">✕</button>
     </div>
     <div class="modal-body">
-      <div class="filter-tabs" style="width: 100%; display: grid; grid-template-columns: 1fr 1fr;">
+      <div class="filter-tabs" style="width: 100%; display: grid; grid-template-columns: 1fr 1fr 1fr;">
         <button type="button" id="tab-login-mode" class="tab-btn active">Đăng nhập</button>
         <button type="button" id="tab-register-mode" class="tab-btn">Đăng ký mới</button>
+        <button type="button" id="tab-forgot-mode" class="tab-btn">Quên MK</button>
       </div>
 
       <form id="member-auth-form" style="display: grid; gap: 12px;">
-        <div class="form-group" style="margin: 0;">
-          <label for="m-username">Tên tài khoản (viết liền không dấu) <span class="req">*</span></label>
-          <input type="text" id="m-username" placeholder="Ví dụ: minhkhoi99" autocomplete="username" required />
+        <div id="m-username-wrap" class="form-group" style="margin: 0;">
+          <label id="m-username-label" for="m-username">Tên tài khoản hoặc Email <span class="req">*</span></label>
+          <input type="text" id="m-username" placeholder="Ví dụ: vancudz hoặc email@gmail.com" autocomplete="username" required />
         </div>
 
-        <div class="form-group" style="margin: 0;">
-          <label for="m-password">Mật khẩu (tối thiểu 6 ký tự) <span class="req">*</span></label>
-          <input type="password" id="m-password" placeholder="Nhập mật khẩu..." autocomplete="current-password" required />
+        <div id="m-email-wrap" class="form-group" style="margin: 0;" hidden>
+          <label for="m-email">Email khôi phục mật khẩu <span class="req">*</span></label>
+          <input type="email" id="m-email" placeholder="Nhập Gmail thật để lấy lại MK khi quên..." autocomplete="email" />
+        </div>
+
+        <div id="m-password-wrap" class="form-group" style="margin: 0;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <label for="m-password" style="margin-bottom: 4px;">Mật khẩu (tối thiểu 6 ký tự) <span class="req">*</span></label>
+            <button type="button" id="forgot-quick-link" style="background: none; border: none; color: var(--cyan); font-size: 0.82rem; font-weight: 600; cursor: pointer; text-decoration: underline;">
+              Quên mật khẩu?
+            </button>
+          </div>
+          <input type="password" id="m-password" placeholder="Nhập mật khẩu..." autocomplete="current-password" />
         </div>
 
         <div id="m-confirm-wrap" class="form-group" style="margin: 0;" hidden>
@@ -415,6 +426,7 @@
         </div>
 
         <p id="member-auth-error" class="form-error" style="margin: 0;" hidden></p>
+        <p id="member-auth-success" style="margin: 0; color: #a7f3d0; background: rgba(34,197,94,0.15); border: 1px solid var(--success); border-radius: 8px; padding: 9px 11px; font-size: 0.86rem;" hidden></p>
 
         <button type="submit" id="member-auth-submit" class="btn btn-cyan btn-full">
           Đăng nhập vào Shop

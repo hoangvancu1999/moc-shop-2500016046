@@ -54,6 +54,16 @@ service cloud.firestore {
       allow read, update, delete: if false;
     }
 
+    // Ánh xạ Tên tài khoản -> Email khôi phục (chỉ tra cứu đơn lẻ, cấm quét danh sách)
+    match /usernames/{username} {
+      allow get: if true;
+      allow list: if false;
+      allow create: if request.auth != null &&
+                    !exists(/databases/$(database)/documents/usernames/$(username)) &&
+                    request.resource.data.uid == request.auth.uid;
+      allow update, delete: if isAdminAuth() || (request.auth != null && resource.data.uid == request.auth.uid);
+    }
+
     // === HỆ THỐNG THÀNH VIÊN & VÍ SỐ DƯ (CHỐNG GIAN LẬN F12 TUYỆT ĐỐI) ===
     match /users/{uid} {
       // Thành viên đọc ví của mình; Admin xem danh sách thành viên để quản lý số dư

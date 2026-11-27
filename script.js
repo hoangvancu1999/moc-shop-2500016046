@@ -18,6 +18,7 @@ import {
   getAuth,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  sendPasswordResetEmail,
   signOut,
   onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
@@ -36,6 +37,7 @@ const firebaseConfig = {
 const firebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp);
 const auth = getAuth(firebaseApp);
+auth.languageCode = "vi";
 
 const CART_KEY = "hcugaming_cart";
 const RECEIPTS_KEY = "hcugaming_receipts";
@@ -53,11 +55,12 @@ let activeOrderUnsub = null;
 let activeOrderMeta = null;
 
 // Trạng thái Thành viên & Ví số dư
-let authMode = "login"; // "login" | "register"
+let authMode = "login"; // "login" | "register" | "forgot"
 let currentMember = null; // { uid, username, balance, totalDeposited }
 let memberDocUnsub = null;
 let activeTopupCode = null;
 let pendingBuyAccId = null;
+let isRegisteringMember = false;
 
 function formatVND(amount) {
   return `${Number(amount || 0).toLocaleString("vi-VN")}đ`;
@@ -309,10 +312,11 @@ function renderServices() {
     .join("");
 }
 
-// === ĐĂNG KÝ & ĐĂNG NHẬP THÀNH VIÊN + VÍ SỐ DƯ ===
+// === ĐĂNG KÝ, ĐĂNG NHẬP & QUÊN MẬT KHẨU QUA EMAIL ===
 function openAuthModal(mode = "login") {
   setAuthMode(mode);
   document.getElementById("member-auth-error").hidden = true;
+  document.getElementById("member-auth-success").hidden = true;
   document.getElementById("auth-overlay").hidden = false;
   document.getElementById("auth-modal").hidden = false;
 }
@@ -323,12 +327,47 @@ function closeAuthModal() {
 }
 
 function setAuthMode(mode) {
-  authMode = mode;
+  authMode = mode; // "login" | "register" | "forgot"
   document.getElementById("tab-login-mode").classList.toggle("active", mode === "login");
   document.getElementById("tab-register-mode").classList.toggle("active", mode === "register");
-  document.getElementById("m-confirm-wrap").hidden = mode === "login";
-  document.getElementById("member-auth-submit").textContent =
-    mode === "login" ? "Đăng nhập vào Shop" : "Tạo tài khoản mới";
+  document.getElementById("tab-forgot-mode").classList.toggle("active", mode === "forgot");
+
+  document.getElementById("member-auth-error").hidden = true;
+  document.getElementById("member-auth-success").hidden = true;
+
+  const userLabel = document.getElementById("m-username-label");
+  const userInput = document.getElementById("m-username");
+  const emailWrap = document.getElementById("m-email-wrap");
+  const passWrap = document.getElementById("m-password-wrap");
+  const confirmWrap = document.getElementById("m-confirm-wrap");
+  const forgotQuick = document.getElementById("forgot-quick-link");
+  const submitBtn = document.getElementById("member-auth-submit");
+
+  if (mode === "login") {
+    userLabel.innerHTML = `Tên tài khoản hoặc Email <span class="req">*</span>`;
+    userInput.placeholder = "Ví dụ: vancudz hoặc email@gmail.com";
+    emailWrap.hidden = true;
+    passWrap.hidden = false;
+    confirmWrap.hidden = true;
+    forgotQuick.hidden = false;
+    submitBtn.textContent = "Đăng nhập vào Shop";
+  } else if (mode === "register") {
+    userLabel.innerHTML = `Tên tài khoản (viết liền không dấu) <span class="req">*</span>`;
+    userInput.placeholder = "Ví dụ: vancudz";
+    emailWrap.hidden = false;
+    passWrap.hidden = false;
+    confirmWrap.hidden = false;
+    forgotQuick.hidden = true;
+    submitBtn.textContent = "Tạo tài khoản mới";
+  } else {
+    userLabel.innerHTML = `Nhập Email hoặc Tên tài khoản đã đăng ký <span class="req">*</span>`;
+    userInput.placeholder = "Ví dụ: email@gmail.com hoặc vancudz";
+    emailWrap.hidden = true;
+    passWrap.hidden = true;
+    confirmWrap.hidden = true;
+    forgotQuick.hidden = true;
+    submitBtn.textContent = "📧 Gửi link đặt lại mật khẩu về Email";
+  }
 }
 
 function updateMemberHeaderUI() {
@@ -349,51 +388,162 @@ function updateMemberHeaderUI() {
   document.getElementById("topup-balance-label").textContent = formatVND(currentMember.balance);
 }
 
+async function resolveIdentifierToEmail(identifier) {
+  const clean = identifier.trim().toLowerCase();
+  if (clean.includes("@")) {
+    return { email: clean, isInternalFallback: clean.endsWith(`@${MEMBER_EMAIL_DOMAIN}`) };
+  }
+  // Tra cứu trong bảng usernames/{username}
+  try {
+    const uSnap = await getDoc(doc(db, "usernames", clean));
+    if (uSnap.exists() && uSnap.data().email) {
+      return { email: uSnap.data().email, isInternalFallback: false };
+    }
+  } catch (e) {
+    // Bỏ qua
+  }
+  return { email: usernameToInternalEmail(clean), isInternalFallback: true };
+}
+
 async function handleMemberAuthSubmit(e) {
   e.preventDefault();
-  const rawUser = document.getElementById("m-username").value.trim().toLowerCase();
+  const rawInput = document.getElementById("m-username").value.trim().toLowerCase();
+  const rawEmail = document.getElementById("m-email").value.trim().toLowerCase();
   const pass = document.getElementById("m-password").value;
   const confirmPass = document.getElementById("m-confirm").value;
   const errEl = document.getElementById("member-auth-error");
+  const okEl = document.getElementById("member-auth-success");
   const submitBtn = document.getElementById("member-auth-submit");
 
   errEl.hidden = true;
+  okEl.hidden = true;
 
-  if (!/^[a-z0-9_]{4,24}$/.test(rawUser)) {
-    errEl.textContent = "Tên tài khoản chỉ gồm chữ thường, số hoặc dấu gạch dưới (4–24 ký tự).";
-    errEl.hidden = false;
-    return;
-  }
-  if (pass.length < 6) {
-    errEl.textContent = "Mật khẩu phải có ít nhất 6 ký tự.";
-    errEl.hidden = false;
-    return;
-  }
-  if (authMode === "register" && pass !== confirmPass) {
-    errEl.textContent = "Mật khẩu nhập lại không khớp.";
-    errEl.hidden = false;
-    return;
-  }
-
-  const email = usernameToInternalEmail(rawUser);
-  submitBtn.disabled = true;
-
-  try {
-    if (authMode === "register") {
-      const cred = await createUserWithEmailAndPassword(auth, email, pass);
-      await setDoc(doc(db, "users", cred.user.uid), {
-        uid: cred.user.uid,
-        username: rawUser,
-        balance: 0,
-        totalDeposited: 0,
-        createdAt: serverTimestamp(),
-        createdAtISO: new Date().toISOString()
-      });
-      showToast(`🎉 Tạo tài khoản "${rawUser}" thành công!`);
-    } else {
-      await signInWithEmailAndPassword(auth, email, pass);
-      showToast(`Chào mừng "${rawUser}" quay trở lại!`);
+  // 1. Chế độ QUÊN MẬT KHẨU
+  if (authMode === "forgot") {
+    if (!rawInput) {
+      errEl.textContent = "Vui lòng nhập Email hoặc Tên tài khoản của bạn.";
+      errEl.hidden = false;
+      return;
     }
+
+    submitBtn.disabled = true;
+    try {
+      const resolved = await resolveIdentifierToEmail(rawInput);
+      if (resolved.isInternalFallback) {
+        errEl.textContent =
+          "Không tìm thấy Email khôi phục gắn với tên tài khoản này (hoặc tài khoản chưa được tạo). Vui lòng nhập đúng địa chỉ Email hoặc liên hệ Zalo Admin 0911507170.";
+        errEl.hidden = false;
+        return;
+      }
+
+      await sendPasswordResetEmail(auth, resolved.email);
+      okEl.innerHTML = `✓ Đã gửi đường link đặt lại mật khẩu tới hộp thư <strong>${resolved.email}</strong>! Vui lòng kiểm tra Hộp thư đến (và cả mục Thư rác/Spam) rồi bấm vào link để tạo mật khẩu mới nhé.`;
+      okEl.hidden = false;
+    } catch (err) {
+      console.error("Lỗi gửi mail đặt lại MK:", err);
+      if (err.code === "auth/invalid-email") {
+        errEl.textContent = "Địa chỉ Email không đúng định dạng.";
+      } else {
+        errEl.textContent = "Không thể gửi email khôi phục cho địa chỉ này. Vui lòng kiểm tra lại Email đã nhập.";
+      }
+      errEl.hidden = false;
+    } finally {
+      isRegisteringMember = false;
+      submitBtn.disabled = false;
+    }
+    return;
+  }
+
+  // 2. Chế độ ĐĂNG KÝ MỚI
+  if (authMode === "register") {
+    if (!/^[a-z0-9_]{4,24}$/.test(rawInput)) {
+      errEl.textContent = "Tên tài khoản chỉ gồm chữ thường, số hoặc dấu gạch dưới (4–24 ký tự).";
+      errEl.hidden = false;
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawEmail)) {
+      errEl.textContent = "Vui lòng nhập địa chỉ Email thật hợp lệ (ví dụ: tenban@gmail.com) để dùng khi quên mật khẩu.";
+      errEl.hidden = false;
+      return;
+    }
+    if (pass.length < 6) {
+      errEl.textContent = "Mật khẩu phải có ít nhất 6 ký tự.";
+      errEl.hidden = false;
+      return;
+    }
+    if (pass !== confirmPass) {
+      errEl.textContent = "Mật khẩu nhập lại không khớp.";
+      errEl.hidden = false;
+      return;
+    }
+
+    submitBtn.disabled = true;
+    isRegisteringMember = true;
+    try {
+      const existingUsername = await getDoc(doc(db, "usernames", rawInput));
+      if (existingUsername.exists()) {
+        errEl.textContent = "Tên tài khoản này đã có người đăng ký. Vui lòng chọn tên khác.";
+        errEl.hidden = false;
+        return;
+      }
+
+      const cred = await createUserWithEmailAndPassword(auth, rawEmail, pass);
+      await Promise.all([
+        setDoc(doc(db, "usernames", rawInput), {
+          uid: cred.user.uid,
+          username: rawInput,
+          email: rawEmail,
+          createdAtISO: new Date().toISOString()
+        }),
+        setDoc(doc(db, "users", cred.user.uid), {
+          uid: cred.user.uid,
+          username: rawInput,
+          email: rawEmail,
+          balance: 0,
+          totalDeposited: 0,
+          createdAt: serverTimestamp(),
+          createdAtISO: new Date().toISOString()
+        })
+      ]);
+
+      showToast(`🎉 Tạo tài khoản "${rawInput}" thành công!`);
+      document.getElementById("member-auth-form").reset();
+      closeAuthModal();
+
+      if (pendingBuyAccId) {
+        const targetId = pendingBuyAccId;
+        pendingBuyAccId = null;
+        setTimeout(() => openBuyNowModal(targetId), 350);
+      }
+    } catch (err) {
+      console.error("Lỗi đăng ký:", err);
+      if (err.code === "auth/email-already-in-use") {
+        errEl.textContent = "Địa chỉ Email này đã được dùng cho một tài khoản khác. Bạn có thể bấm 'Quên MK' để lấy lại mật khẩu!";
+      } else if (err.code === "auth/invalid-email") {
+        errEl.textContent = "Địa chỉ Email không hợp lệ.";
+      } else {
+        errEl.textContent = "Không thể đăng ký lúc này, vui lòng thử lại.";
+      }
+      errEl.hidden = false;
+    } finally {
+      isRegisteringMember = false;
+      submitBtn.disabled = false;
+    }
+    return;
+  }
+
+  // 3. Chế độ ĐĂNG NHẬP
+  if (!rawInput || pass.length < 6) {
+    errEl.textContent = "Vui lòng nhập đầy đủ Tên tài khoản/Email và Mật khẩu (tối thiểu 6 ký tự).";
+    errEl.hidden = false;
+    return;
+  }
+
+  submitBtn.disabled = true;
+  try {
+    const resolved = await resolveIdentifierToEmail(rawInput);
+    await signInWithEmailAndPassword(auth, resolved.email, pass);
+    showToast("Đăng nhập thành công!");
     document.getElementById("member-auth-form").reset();
     closeAuthModal();
 
@@ -403,17 +553,8 @@ async function handleMemberAuthSubmit(e) {
       setTimeout(() => openBuyNowModal(targetId), 350);
     }
   } catch (err) {
-    console.error("Lỗi xác thực thành viên:", err);
-    if (err.code === "auth/email-already-in-use") {
-      errEl.textContent = "Tên tài khoản này đã có người sử dụng. Vui lòng chọn tên khác hoặc chuyển sang Đăng nhập.";
-    } else if (err.code === "auth/invalid-credential" || err.code === "auth/user-not-found" || err.code === "auth/wrong-password") {
-      errEl.textContent = "Sai tên tài khoản hoặc mật khẩu.";
-    } else if (err.code === "auth/configuration-not-found" || err.code === "auth/operation-not-allowed") {
-      errEl.textContent =
-        "Chủ shop cần bật phương thức đăng nhập 'Email/Password' trong Firebase Console (mục Authentication → Sign-in method) để kích hoạt tạo tài khoản.";
-    } else {
-      errEl.textContent = "Không thể đăng nhập lúc này, vui lòng thử lại.";
-    }
+    console.error("Lỗi đăng nhập:", err);
+    errEl.textContent = "Sai Tên tài khoản/Email hoặc Mật khẩu. Nếu quên mật khẩu, hãy bấm 'Quên mật khẩu?' nhé!";
     errEl.hidden = false;
   } finally {
     submitBtn.disabled = false;
@@ -1211,9 +1352,11 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     memberDocUnsub = onSnapshot(userRef, async (snap) => {
       if (!snap.exists()) {
+        if (isRegisteringMember) return;
         await setDoc(userRef, {
           uid: user.uid,
           username: fallbackUsername,
+          email: user.email || "",
           balance: 0,
           totalDeposited: 0,
           createdAt: serverTimestamp(),
@@ -1299,6 +1442,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("auth-overlay").addEventListener("click", closeAuthModal);
   document.getElementById("tab-login-mode").addEventListener("click", () => setAuthMode("login"));
   document.getElementById("tab-register-mode").addEventListener("click", () => setAuthMode("register"));
+  document.getElementById("tab-forgot-mode").addEventListener("click", () => setAuthMode("forgot"));
+  document.getElementById("forgot-quick-link").addEventListener("click", () => setAuthMode("forgot"));
   document.getElementById("member-auth-form").addEventListener("submit", handleMemberAuthSubmit);
   document.getElementById("member-logout-btn").addEventListener("click", async () => {
     await signOut(auth);

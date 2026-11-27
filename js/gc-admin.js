@@ -353,7 +353,10 @@ function renderTopupsAndMembers() {
       .map(
         (m) => `
         <tr>
-          <td><strong>${m.username}</strong></td>
+          <td>
+            <strong>${m.username}</strong>
+            ${m.email ? `<br/><span style="font-size:0.78rem; color:var(--text-muted);">${m.email}</span>` : ""}
+          </td>
           <td><strong style="color: var(--tac-green);">${Number(m.balance || 0).toLocaleString("vi-VN")} VNĐ</strong></td>
           <td>${Number(m.totalDeposited || 0).toLocaleString("vi-VN")} VNĐ</td>
           <td style="font-size: 0.8rem;">${(m.createdAtISO || "").slice(0, 10)}</td>
