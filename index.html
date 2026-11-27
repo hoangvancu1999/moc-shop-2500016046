@@ -30,11 +30,16 @@
         <a href="#lien-he">Liên hệ</a>
       </nav>
 
-      <button type="button" id="open-cart-btn" class="cart-trigger" aria-label="Mở giỏ hàng">
-        <span aria-hidden="true">🛒</span>
-        <span class="cart-text">Đơn hàng</span>
-        <span id="cart-count" class="cart-badge">0</span>
-      </button>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <button type="button" id="open-my-orders-btn" class="btn btn-outline btn-sm" aria-label="Nhận Acc đã mua">
+          🔑 Nhận Acc
+        </button>
+        <button type="button" id="open-cart-btn" class="cart-trigger" aria-label="Mở giỏ hàng">
+          <span aria-hidden="true">🛒</span>
+          <span class="cart-text">Đơn hàng</span>
+          <span id="cart-count" class="cart-badge">0</span>
+        </button>
+      </div>
     </div>
   </header>
 
@@ -253,15 +258,46 @@
     </div>
 
     <div class="drawer-body">
-      <!-- Thông báo đặt đơn thành công -->
+      <!-- Màn hình Quét VietQR & Nhận Acc tự động trên web -->
       <div id="order-success" class="order-success" hidden>
-        <div class="success-badge">✓ ĐÃ GHI NHẬN ĐƠN HÀNG</div>
-        <h3>Cảm ơn bạn đã chọn HcuGaming!</h3>
-        <p>Mã đơn của bạn: <strong id="order-code" class="neon-cyan"></strong></p>
-        <p class="success-desc">
-          Admin HcuGaming sẽ liên hệ qua Zalo/SĐT bạn đã cung cấp trong vòng 5 phút (hoặc bạn có thể nhắn trực tiếp Zalo Admin: <strong>0911507170</strong>).
-        </p>
-        <button type="button" id="continue-btn" class="btn btn-cyan btn-full">Tiếp tục xem shop</button>
+        <div id="payment-pending-box" class="vietqr-box">
+          <div class="success-badge" style="color: var(--gold);">⏳ QUÉT MÃ VIETQR ĐỂ THANH TOÁN</div>
+          <p style="font-size: 0.88rem; color: var(--text-muted);">
+            Mã đơn: <strong id="order-code" class="neon-cyan"></strong>
+          </p>
+          <div class="qr-frame">
+            <img id="vietqr-img" src="" alt="Mã VietQR MB Bank HOANG VAN CU" class="vietqr-img" />
+          </div>
+          <div class="bank-info-card">
+            <div class="bank-row"><span>Ngân hàng:</span><strong>MB Bank (Quân Đội)</strong></div>
+            <div class="bank-row"><span>Số tài khoản:</span><strong>0911507170</strong></div>
+            <div class="bank-row"><span>Chủ tài khoản:</span><strong>HOANG VAN CU</strong></div>
+            <div class="bank-row"><span>Số tiền:</span><strong id="qr-amount" class="neon-gold">0đ</strong></div>
+            <div class="bank-row"><span>Nội dung CK:</span><strong id="qr-memo" class="neon-cyan"></strong></div>
+          </div>
+          <div class="receipt-token-box">
+            <div style="font-size: 0.78rem; color: var(--text-muted);">Mã bí mật nhận Acc (hãy lưu lại nếu đổi trình duyệt):</div>
+            <code id="buyer-receipt-code" class="receipt-code"></code>
+          </div>
+          <p id="payment-live-status" class="success-desc">
+            Quét QR trên app ngân hàng (đã điền sẵn số tiền &amp; nội dung). Ngay khi Admin xác nhận tiền vào, <strong>Tài khoản &amp; Mật khẩu sẽ tự động hiện ngay tại đây!</strong>
+          </p>
+          <button type="button" id="mark-paid-btn" class="btn btn-gold btn-full">
+            ✓ Tôi đã chuyển khoản – Báo Admin duyệt ngay
+          </button>
+        </div>
+
+        <!-- Khối hiển thị Tài khoản + Mật khẩu ngay khi thanh toán được xác nhận -->
+        <div id="account-delivered-box" class="delivered-box" hidden>
+          <div class="success-badge">🎉 THANH TOÁN THÀNH CÔNG – ĐÃ MỞ KHÓA ACC!</div>
+          <p style="font-size: 0.88rem;">Cảm ơn bạn đã mua hàng tại <strong>HcuGaming</strong>. Dưới đây là thông tin đăng nhập của bạn:</p>
+          <div id="delivered-items-list" class="delivered-list"></div>
+          <p class="success-desc" style="color: var(--gold);">
+            ⚠️ Vui lòng đăng nhập kiểm tra và đổi mật khẩu ngay để bảo mật tài khoản của bạn. Cần hỗ trợ nhắn Zalo: <strong>0911507170</strong>.
+          </p>
+        </div>
+
+        <button type="button" id="continue-btn" class="btn btn-outline btn-full" style="margin-top: 8px;">Đóng cửa sổ</button>
       </div>
 
       <!-- Giỏ trống -->
@@ -331,6 +367,29 @@
       </form>
     </div>
   </aside>
+
+  <!-- Modal Tra cứu & Nhận Acc đã mua -->
+  <div id="my-orders-overlay" class="overlay" hidden></div>
+  <div id="my-orders-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="my-orders-title" hidden>
+    <div class="modal-header">
+      <strong id="my-orders-title" class="neon-cyan">🔑 Nhận Acc &amp; Đơn Đã Mua Trên Web</strong>
+      <button type="button" id="close-my-orders-btn" class="icon-close" aria-label="Đóng">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label for="claim-input">Nhập Mã bí mật nhận Acc (dạng <code>HCU-XXXXXX.xxxxxx</code>)</label>
+        <div style="display: flex; gap: 8px;">
+          <input type="text" id="claim-input" placeholder="Dán mã nhận acc của bạn..." style="flex: 1; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px;" />
+          <button type="button" id="claim-lookup-btn" class="btn btn-cyan btn-sm">Kiểm tra</button>
+        </div>
+      </div>
+      <div id="claim-lookup-result"></div>
+      <div style="border-top: 1px solid var(--border); padding-top: 12px;">
+        <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 8px;">Các đơn đã đặt trên trình duyệt này:</div>
+        <div id="saved-receipts-list" style="display: grid; gap: 10px;"></div>
+      </div>
+    </div>
+  </div>
 
   <!-- Toast -->
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>

@@ -14,7 +14,7 @@ service cloud.firestore {
       );
     }
 
-    // Collection đơn hàng cửa hàng hiện tại (giữ nguyên 100%)
+    // Collection đơn hàng cũ (giữ nguyên tương thích ngược)
     match /donhang/{orderId} {
       allow create: if true;
       allow read, update, delete: if false;
@@ -31,7 +31,7 @@ service cloud.firestore {
       allow read, delete: if false;
     }
 
-    // Khóa công khai RSA-OAEP mã hóa PII khách hàng & khóa bí mật bọc AES-GCM
+    // Khóa công khai RSA-OAEP & khóa bí mật đã bọc AES-GCM
     match /gc_secrets/vault {
       allow get: if true;
       allow create: if !exists(/databases/$(database)/documents/gc_secrets/vault);
@@ -39,8 +39,13 @@ service cloud.firestore {
       allow list, delete: if false;
     }
 
-    // Dự phòng lưu PII riêng biệt nếu Admin chưa khởi tạo vault
+    // Dự phòng lưu thông tin riêng tư khi Admin chưa khởi tạo vault lần đầu
     match /gc_orders_private/{bookingCode} {
+      allow create: if true;
+      allow read, update, delete: if isAdminAuth();
+    }
+
+    match /shop_orders_private/{orderCode} {
       allow create: if true;
       allow read, update, delete: if isAdminAuth();
     }
@@ -52,7 +57,43 @@ service cloud.firestore {
       allow read, update, delete: if false;
     }
 
-    // Gói dịch vụ, bản đồ và cấu hình lịch trống Game Cùng
+    // === KHO ACCOUNT & THANH TOÁN VIETQR GIAO ACC TRÊN WEB ===
+    match /shop_accounts/{accId} {
+      allow read: if true;
+      allow create, update: if isAdminWrite();
+      allow delete: if isAdminAuth();
+    }
+
+    // Két lưu Tài khoản + Mật khẩu game đã mã hóa RSA-OAEP (chỉ Admin có Private Key mới giải mã được)
+    match /shop_vault_stock/{accId} {
+      allow read: if true;
+      allow create, update: if isAdminWrite();
+      allow delete: if isAdminAuth();
+    }
+
+    // Đơn mua Account / Dịch vụ thanh toán qua VietQR
+    match /shop_orders/{maDon} {
+      allow read: if true;
+      allow create: if request.resource.data.paymentStatus == "Awaiting_Transfer" &&
+                    !("soDienThoai" in request.resource.data) &&
+                    !("deliveryToken" in request.resource.data);
+      allow update: if isAdminWrite() || (
+        resource.data.paymentStatus == "Awaiting_Transfer" &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(["paymentStatus"]) &&
+        request.resource.data.paymentStatus == "Customer_Marked_Paid"
+      );
+      allow delete: if isAdminAuth();
+    }
+
+    // Hộp bàn giao Tài khoản + Mật khẩu sau khi Admin xác nhận tiền về (CẤM list tuyệt đối!)
+    match /shop_deliveries/{deliveryToken} {
+      allow get: if true;
+      allow list: if false;
+      allow create, update: if isAdminWrite();
+      allow delete: if isAdminAuth();
+    }
+
+    // === DỊCH VỤ GAME CÙNG DELTA FORCE ===
     match /gc_packages/{pkgId} {
       allow read: if true;
       allow create, update: if isAdminWrite();
@@ -71,7 +112,6 @@ service cloud.firestore {
       allow delete: if isAdminAuth();
     }
 
-    // Đơn đặt lịch Game Cùng (PII đã mã hóa RSA-OAEP, đơn mới bắt buộc là Pending)
     match /gc_orders/{bookingCode} {
       allow read: if true;
       allow create: if request.resource.data.status == "Pending" &&
@@ -87,7 +127,6 @@ service cloud.firestore {
       allow delete: if isAdminAuth();
     }
 
-    // Đánh giá đã xác thực từ đơn hàng hoàn thành (Completed)
     match /gc_reviews/{reviewId} {
       allow read: if true;
       allow create: if request.resource.data.bookingCode is string &&

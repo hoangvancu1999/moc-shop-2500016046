@@ -26,6 +26,7 @@ import {
   randomTokenHex,
   createAdminVault,
   unlockAdminPrivateKey,
+  encryptCustomerPii,
   decryptCustomerPii
 } from "./gc-crypto.js";
 
@@ -34,6 +35,9 @@ let adminPrivateKey = null;
 let isVaultInitialized = false;
 let vaultDocData = null;
 
+let shopAccounts = [];
+let stockVaultMap = new Map();
+let shopOrders = [];
 let packages = [];
 let maps = [];
 let scheduleConfig = { ...DEFAULT_SCHEDULE_CONFIG };
@@ -46,7 +50,7 @@ function showToast(msg) {
   el.hidden = false;
   setTimeout(() => {
     el.hidden = true;
-  }, 2600);
+  }, 3000);
 }
 
 function adminPayload(data) {
@@ -61,16 +65,16 @@ async function checkVaultSetupState() {
     if (vaultSnap.exists()) {
       isVaultInitialized = true;
       vaultDocData = vaultSnap.data();
-      document.getElementById("auth-heading").textContent = "Đăng Nhập Quản Trị Game Cùng";
+      document.getElementById("auth-heading").textContent = "Đăng Nhập Quản Trị HcuGaming";
       document.getElementById("auth-desc").textContent =
-        "Nhập mật khẩu Quản trị để quản lý gói dịch vụ, xác nhận lịch và giải mã Discord ID khách hàng.";
+        "Nhập mật khẩu Quản trị để quản lý Kho Account, duyệt tiền VietQR (MB Bank 0911507170) và lịch Game Cùng.";
       document.getElementById("admin-pass-confirm-wrap").hidden = true;
       document.getElementById("admin-login-btn").textContent = "Đăng nhập Quản trị";
     } else {
       isVaultInitialized = false;
       document.getElementById("auth-heading").textContent = "Khởi Tạo Mật Khẩu Quản Trị Lần Đầu";
       document.getElementById("auth-desc").textContent =
-        "Tạo mật khẩu Quản trị (tối thiểu 6 ký tự) để sinh cặp khóa mã hóa bảo vệ Discord ID khách hàng trên Cloud Firestore.";
+        "Tạo mật khẩu Quản trị (tối thiểu 6 ký tự) để sinh két mã hóa RSA-2048 bảo vệ Mật khẩu Acc Game & thông tin khách hàng.";
       document.getElementById("admin-pass-confirm-wrap").hidden = false;
       document.getElementById("admin-login-btn").textContent = "Khởi tạo & Vào trang Quản trị";
     }
@@ -137,12 +141,19 @@ async function handlePassphraseSubmit(e) {
 }
 
 async function ensureSeedDataIfEmpty() {
-  const [pkgSnap, mapSnap, cfgSnap] = await Promise.all([
+  const [accSnap, pkgSnap, mapSnap, cfgSnap] = await Promise.all([
+    getDocs(collection(db, "shop_accounts")),
     getDocs(collection(db, "gc_packages")),
     getDocs(collection(db, "gc_maps")),
     getDoc(doc(db, "gc_config", "schedule"))
   ]);
 
+  const initialAccs = typeof window.ACCOUNTS !== "undefined" ? window.ACCOUNTS : typeof ACCOUNTS !== "undefined" ? ACCOUNTS : [];
+  if (accSnap.empty && initialAccs.length > 0) {
+    for (const a of initialAccs) {
+      await setDoc(doc(db, "shop_accounts", a.id), adminPayload({ ...a, sold: false, visible: true, deleted: false }));
+    }
+  }
   if (pkgSnap.empty) {
     for (const pkg of DEFAULT_PACKAGES) {
       await setDoc(doc(db, "gc_packages", pkg.id), adminPayload({ ...pkg, deleted: false }));
@@ -161,13 +172,65 @@ async function ensureSeedDataIfEmpty() {
 async function loadAllDashboardData() {
   await ensureSeedDataIfEmpty();
 
-  const [pkgSnap, mapSnap, cfgSnap, ordSnap, revSnap] = await Promise.all([
-    getDocs(collection(db, "gc_packages")),
-    getDocs(collection(db, "gc_maps")),
-    getDoc(doc(db, "gc_config", "schedule")),
-    getDocs(collection(db, "gc_orders")),
-    getDocs(collection(db, "gc_reviews"))
-  ]);
+  const [accSnap, vaultStockSnap, shopOrdSnap, pkgSnap, mapSnap, cfgSnap, ordSnap, revSnap] =
+    await Promise.all([
+      getDocs(collection(db, "shop_accounts")),
+      getDocs(collection(db, "shop_vault_stock")),
+      getDocs(collection(db, "shop_orders")),
+      getDocs(collection(db, "gc_packages")),
+      getDocs(collection(db, "gc_maps")),
+      getDoc(doc(db, "gc_config", "schedule")),
+      getDocs(collection(db, "gc_orders")),
+      getDocs(collection(db, "gc_reviews"))
+    ]);
+
+  shopAccounts = [];
+  accSnap.forEach((d) => {
+    const data = d.data();
+    if (!data.deleted) shopAccounts.push({ id: d.id, ...data });
+  });
+
+  stockVaultMap = new Map();
+  for (const d of vaultStockSnap.docs) {
+    const raw = d.data();
+    if (adminPrivateKey && raw.encryptedCredentials) {
+      try {
+        const creds = await decryptCustomerPii(adminPrivateKey, raw.encryptedCredentials);
+        if (creds) stockVaultMap.set(d.id, creds);
+      } catch (e) {
+        // Bỏ qua nếu không giải mã được
+      }
+    }
+  }
+
+  shopOrders = [];
+  for (const d of shopOrdSnap.docs) {
+    const raw = d.data();
+    let buyer = {
+      tenKhach: "Khách mua Acc",
+      soDienThoai: "(Mở khóa bằng mật khẩu Admin)",
+      ingame: "",
+      ghiChu: "",
+      deliveryToken: ""
+    };
+    if (adminPrivateKey && raw.encryptedOrderBox) {
+      try {
+        const decBox = await decryptCustomerPii(adminPrivateKey, raw.encryptedOrderBox);
+        if (decBox) buyer = decBox;
+      } catch (e) {
+        // Bỏ qua
+      }
+    } else if (auth.currentUser) {
+      try {
+        const pSnap = await getDoc(doc(db, "shop_orders_private", d.id));
+        if (pSnap.exists()) buyer = pSnap.data();
+      } catch (e) {
+        // Bỏ qua
+      }
+    }
+    shopOrders.push({ maDon: d.id, ...raw, buyer });
+  }
+  shopOrders.sort((a, b) => String(b.ngayTaoISO || "").localeCompare(String(a.ngayTaoISO || "")));
 
   packages = [];
   pkgSnap.forEach((d) => {
@@ -201,14 +264,14 @@ async function loadAllDashboardData() {
         const decrypted = await decryptCustomerPii(adminPrivateKey, raw.encryptedPii);
         if (decrypted) pii = decrypted;
       } catch (e) {
-        // Đơn cũ tạo bằng khóa khác
+        // Bỏ qua
       }
     } else if (auth.currentUser) {
       try {
         const privSnap = await getDoc(doc(db, "gc_orders_private", d.id));
         if (privSnap.exists()) pii = privSnap.data();
       } catch (e) {
-        // Bỏ qua nếu không có
+        // Bỏ qua
       }
     }
 
@@ -223,6 +286,8 @@ async function loadAllDashboardData() {
   });
 
   renderKpis();
+  renderShopOrdersTable();
+  renderStockTable();
   renderOrdersTable();
   renderPackagesTable();
   renderScheduleAndMaps();
@@ -231,13 +296,21 @@ async function loadAllDashboardData() {
 }
 
 function renderKpis() {
-  const pendingCount = orders.filter((o) => o.status === "Pending").length;
-  const paidOrders = orders.filter((o) => o.status === "Paid" || o.status === "Completed");
+  const shopPending = shopOrders.filter(
+    (o) => o.paymentStatus === "Awaiting_Transfer" || o.paymentStatus === "Customer_Marked_Paid"
+  ).length;
+  const gcPending = orders.filter((o) => o.status === "Pending").length;
+
+  const shopRevenue = shopOrders
+    .filter((o) => o.paymentStatus === "Paid_Delivered")
+    .reduce((s, o) => s + Number(o.tongTien || 0), 0);
+  const gcRevenue = orders
+    .filter((o) => o.status === "Paid" || o.status === "Completed")
+    .reduce((s, o) => s + Number(o.price || 0), 0);
+
   const activeOrders = orders.filter((o) =>
     ["Confirmed", "Paid", "In Progress", "Completed"].includes(o.status)
   );
-
-  const revenue = paidOrders.reduce((sum, o) => sum + Number(o.price || 0), 0);
   const totalMinutes = activeOrders.reduce((sum, o) => sum + Number(o.duration || 0), 0);
   const totalHours = (totalMinutes / 60).toFixed(1).replace(/\.0$/, "");
 
@@ -249,19 +322,194 @@ function renderKpis() {
       pkgCounter[key] = (pkgCounter[key] || 0) + 1;
     });
 
-  let topPkgText = "Chưa có đơn";
+  let topPkgText = "Gói đặt nhiều nhất: Chưa có";
   let maxCount = 0;
   for (const [name, cnt] of Object.entries(pkgCounter)) {
     if (cnt > maxCount) {
       maxCount = cnt;
-      topPkgText = `${name} (${cnt} đơn)`;
+      topPkgText = `Top: ${name} (${cnt})`;
     }
   }
 
-  document.getElementById("kpi-pending").textContent = String(pendingCount);
-  document.getElementById("kpi-revenue").textContent = `${revenue.toLocaleString("vi-VN")} VNĐ`;
+  document.getElementById("kpi-shop-pending").textContent = String(shopPending);
+  document.getElementById("kpi-pending").textContent = String(gcPending);
+  document.getElementById("kpi-revenue").textContent = `${(shopRevenue + gcRevenue).toLocaleString("vi-VN")} VNĐ`;
   document.getElementById("kpi-hours").textContent = `${totalHours} giờ`;
   document.getElementById("kpi-top-pkg").textContent = topPkgText;
+}
+
+function renderShopOrdersTable() {
+  const tbody = document.getElementById("shop-orders-tbody");
+  if (shopOrders.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color: var(--text-muted);">Chưa có đơn mua Account nào qua VietQR.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = shopOrders
+    .map((o) => {
+      let badgeHtml = `<span class="status-pill status-pending">Chờ chuyển khoản</span>`;
+      if (o.paymentStatus === "Customer_Marked_Paid") {
+        badgeHtml = `<span class="status-pill status-confirmed">⚡ Khách báo đã CK!</span>`;
+      } else if (o.paymentStatus === "Paid_Delivered") {
+        badgeHtml = `<span class="status-pill status-completed">✓ Đã giao Acc</span>`;
+      } else if (o.paymentStatus === "Cancelled") {
+        badgeHtml = `<span class="status-pill status-cancelled">Đã hủy</span>`;
+      }
+
+      const itemsStr = (o.danhSachMon || []).map((i) => `[#${i.id}] ${i.title}`).join("<br/>");
+      const canDeliver = o.paymentStatus !== "Paid_Delivered" && o.paymentStatus !== "Cancelled";
+
+      return `
+        <tr>
+          <td>
+            <strong>${o.maDon}</strong><br/>
+            <code style="color: var(--tac-cyan);">CK: ${o.transferCode || ""}</code>
+          </td>
+          <td>
+            <strong>${o.buyer.tenKhach}</strong><br/>
+            <span style="color: var(--tac-green); font-size: 0.82rem;">Zalo/SĐT: ${o.buyer.soDienThoai}</span>
+            ${o.buyer.ghiChu ? `<br/><span style="color: var(--tac-amber); font-size: 0.8rem;">Ghi chú: ${o.buyer.ghiChu}</span>` : ""}
+          </td>
+          <td style="font-size: 0.85rem;">${itemsStr}</td>
+          <td><strong style="color: var(--tac-amber);">${Number(o.tongTien || 0).toLocaleString("vi-VN")} VNĐ</strong></td>
+          <td>${badgeHtml}</td>
+          <td>
+            ${
+              canDeliver
+                ? `<div style="display:flex; gap:6px; flex-wrap:wrap;">
+                     <button type="button" class="btn btn-primary btn-sm approve-deliver-btn" data-code="${o.maDon}">
+                       ✓ Đã nhận tiền &amp; Giao Acc
+                     </button>
+                     <button type="button" class="btn btn-danger btn-sm cancel-shop-order-btn" data-code="${o.maDon}">
+                       Hủy
+                     </button>
+                   </div>`
+                : `<span style="font-size: 0.82rem; color: var(--text-muted);">Hoàn tất</span>`
+            }
+          </td>
+        </tr>
+      `;
+    })
+    .join("");
+}
+
+function renderStockTable() {
+  const tbody = document.getElementById("stock-tbody");
+  if (shopAccounts.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color: var(--text-muted);">Chưa có Account nào trong kho.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = shopAccounts
+    .map((a) => {
+      const creds = stockVaultMap.get(a.id);
+      const hasCreds = Boolean(creds && creds.loginUser && creds.loginPass);
+      return `
+        <tr>
+          <td><strong>#${a.id}</strong></td>
+          <td>
+            <strong>${a.title}</strong><br/>
+            <span style="font-size: 0.8rem; color: var(--text-muted);">${a.gameLabel || a.game} • ${a.rank || ""}</span>
+          </td>
+          <td><strong style="color: var(--tac-green);">${Number(a.price || 0).toLocaleString("vi-VN")} VNĐ</strong></td>
+          <td>
+            ${
+              hasCreds
+                ? `<span class="status-pill status-completed">✓ Đã gắn TK/MK (${creds.loginUser})</span>`
+                : `<span class="status-pill status-pending">⚠️ Chưa gắn TK/MK</span>`
+            }
+          </td>
+          <td>
+            ${
+              a.sold
+                ? `<span class="status-pill status-cancelled">ĐÃ BÁN</span>`
+                : `<span class="status-pill status-confirmed">Đang bán</span>`
+            }
+          </td>
+          <td>
+            <div style="display:flex; gap:6px;">
+              <button type="button" class="btn btn-outline btn-sm edit-acc-btn" data-id="${a.id}">Sửa / Gắn MK</button>
+              <button type="button" class="btn btn-danger btn-sm del-acc-btn" data-id="${a.id}">Xóa</button>
+            </div>
+          </td>
+        </tr>
+      `;
+    })
+    .join("");
+}
+
+async function handleApproveAndDeliver(maDon) {
+  const order = shopOrders.find((o) => o.maDon === maDon);
+  if (!order) return;
+
+  if (!order.buyer.deliveryToken) {
+    alert("Đơn này được tạo trước khi khởi tạo két mã hóa Admin nên chưa có khóa nhận tự động. Hãy gửi Acc trực tiếp qua Zalo khách hàng nhé!");
+    return;
+  }
+
+  const deliveredItems = [];
+  for (const item of order.danhSachMon || []) {
+    if (item.type === "account") {
+      let creds = stockVaultMap.get(item.id);
+      if (!creds || !creds.loginUser || !creds.loginPass) {
+        const u = prompt(`Mã #${item.id} chưa gắn sẵn TK trong kho. Nhập Tài khoản đăng nhập để giao ngay cho khách:`);
+        if (!u) return;
+        const p = prompt(`Nhập Mật khẩu của #${item.id}:`);
+        if (!p) return;
+        creds = {
+          loginUser: u.trim(),
+          loginPass: p.trim(),
+          guideNote: "Vui lòng đăng nhập kiểm tra và đổi mật khẩu ngay để bảo mật tài khoản!"
+        };
+        if (vaultDocData?.publicKeyJwk) {
+          const encCreds = await encryptCustomerPii(vaultDocData.publicKeyJwk, creds);
+          await setDoc(doc(db, "shop_vault_stock", item.id), adminPayload({ encryptedCredentials: encCreds }));
+        }
+      }
+      deliveredItems.push({
+        id: item.id,
+        title: item.title,
+        loginUser: creds.loginUser,
+        loginPass: creds.loginPass,
+        guideNote: creds.guideNote || ""
+      });
+    } else {
+      deliveredItems.push({
+        id: item.id,
+        title: item.title,
+        loginUser: "Dịch vụ đã xác nhận thanh toán",
+        loginPass: "Liên hệ Zalo 0911507170 để bắt đầu",
+        guideNote: ""
+      });
+    }
+  }
+
+  // 1. Ghi thông tin tài khoản vào hộp nhận bí mật shop_deliveries/{deliveryToken}
+  await setDoc(
+    doc(db, "shop_deliveries", order.buyer.deliveryToken),
+    adminPayload({
+      maDon,
+      items: deliveredItems,
+      deliveredAtISO: new Date().toISOString()
+    })
+  );
+
+  // 2. Đổi trạng thái đơn sang Paid_Delivered (màn hình khách tự động mở khóa ngay lập tức!)
+  await updateDoc(doc(db, "shop_orders", maDon), adminPayload({ paymentStatus: "Paid_Delivered" }));
+
+  // 3. Đánh dấu các Account trong đơn thành ĐÃ BÁN (sold: true)
+  for (const item of order.danhSachMon || []) {
+    if (item.type === "account") {
+      await setDoc(
+        doc(db, "shop_accounts", item.id),
+        adminPayload({ sold: true, badge: "ĐÃ BÁN" }),
+        { merge: true }
+      );
+    }
+  }
+
+  showToast(`🎉 Đã xác nhận tiền về & gửi Acc tự động lên màn hình khách (Đơn ${maDon})!`);
+  await loadAllDashboardData();
 }
 
 function renderOrdersTable() {
@@ -297,13 +545,11 @@ function renderOrdersTable() {
           <td>${formatCurrencyVND(o.price, o.isCustomPrice)}</td>
           <td><span class="status-pill ${st.css}">${o.status}</span></td>
           <td>
-            <div style="display: flex; gap: 6px; align-items: center;">
-              <select class="order-status-select" data-code="${o.bookingCode}" style="background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; font-size: 0.82rem;">
-                ${statuses
-                  .map((s) => `<option value="${s}" ${s === o.status ? "selected" : ""}>${s} (${ORDER_STATUS_META[s].label})</option>`)
-                  .join("")}
-              </select>
-            </div>
+            <select class="order-status-select" data-code="${o.bookingCode}" style="background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; font-size: 0.82rem;">
+              ${statuses
+                .map((s) => `<option value="${s}" ${s === o.status ? "selected" : ""}>${s} (${ORDER_STATUS_META[s].label})</option>`)
+                .join("")}
+            </select>
           </td>
         </tr>
       `;
@@ -377,27 +623,39 @@ function renderScheduleAndMaps() {
 
 function renderCustomersTable() {
   const tbody = document.getElementById("customers-tbody");
-  const byDiscord = new Map();
+  const byContact = new Map();
+
+  shopOrders.forEach((o) => {
+    const key = o.buyer.soDienThoai || o.maDon;
+    const prev = byContact.get(key) || {
+      name: o.buyer.tenKhach,
+      contact: o.buyer.soDienThoai,
+      gameId: o.buyer.ingame || "—",
+      count: 0,
+      spent: 0,
+      lastDate: (o.ngayTaoISO || "").slice(0, 10)
+    };
+    prev.count += 1;
+    if (o.paymentStatus === "Paid_Delivered") prev.spent += Number(o.tongTien || 0);
+    byContact.set(key, prev);
+  });
 
   orders.forEach((o) => {
     const key = o.pii.discordId || o.bookingCode;
-    const prev = byDiscord.get(key) || {
+    const prev = byContact.get(key) || {
       name: o.pii.customerName,
-      discordId: o.pii.discordId,
+      contact: o.pii.discordId,
       gameId: o.pii.gameId || "—",
       count: 0,
       spent: 0,
       lastDate: o.playDate
     };
     prev.count += 1;
-    if (o.status === "Paid" || o.status === "Completed") {
-      prev.spent += Number(o.price || 0);
-    }
-    if (o.playDate > prev.lastDate) prev.lastDate = o.playDate;
-    byDiscord.set(key, prev);
+    if (o.status === "Paid" || o.status === "Completed") prev.spent += Number(o.price || 0);
+    byContact.set(key, prev);
   });
 
-  const list = Array.from(byDiscord.values());
+  const list = Array.from(byContact.values());
   if (list.length === 0) {
     tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color: var(--text-muted);">Chưa có dữ liệu khách hàng.</td></tr>`;
     return;
@@ -408,7 +666,7 @@ function renderCustomersTable() {
       (c) => `
       <tr>
         <td><strong>${c.name}</strong></td>
-        <td style="color: var(--tac-cyan);">${c.discordId}</td>
+        <td style="color: var(--tac-cyan);">${c.contact}</td>
         <td>${c.gameId}</td>
         <td>${c.count} đơn</td>
         <td>${c.spent.toLocaleString("vi-VN")} VNĐ</td>
@@ -504,6 +762,123 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   });
 
+  // Duyệt đơn mua Acc VietQR
+  document.getElementById("refresh-shop-orders-btn").addEventListener("click", loadAllDashboardData);
+  document.getElementById("shop-orders-tbody").addEventListener("click", async (e) => {
+    const approveBtn = e.target.closest(".approve-deliver-btn");
+    if (approveBtn) {
+      await handleApproveAndDeliver(approveBtn.dataset.code);
+      return;
+    }
+    const cancelBtn = e.target.closest(".cancel-shop-order-btn");
+    if (cancelBtn) {
+      await updateDoc(
+        doc(db, "shop_orders", cancelBtn.dataset.code),
+        adminPayload({ paymentStatus: "Cancelled" })
+      );
+      showToast("Đã hủy đơn hàng.");
+      await loadAllDashboardData();
+    }
+  });
+
+  // Quản lý Kho Account & Gắn Mật Khẩu
+  document.getElementById("new-acc-btn").addEventListener("click", () => {
+    document.getElementById("acc-stock-form").reset();
+    document.getElementById("sa-id").readOnly = false;
+    document.getElementById("acc-form-title").textContent = "Đăng Account Mới & Gắn Mật Khẩu";
+    document.getElementById("acc-stock-form").hidden = false;
+  });
+
+  document.getElementById("cancel-acc-btn").addEventListener("click", () => {
+    document.getElementById("acc-stock-form").hidden = true;
+  });
+
+  document.getElementById("stock-tbody").addEventListener("click", async (e) => {
+    const editBtn = e.target.closest(".edit-acc-btn");
+    if (editBtn) {
+      const a = shopAccounts.find((x) => x.id === editBtn.dataset.id);
+      if (!a) return;
+      const creds = stockVaultMap.get(a.id) || {};
+      document.getElementById("sa-id").value = a.id;
+      document.getElementById("sa-id").readOnly = true;
+      document.getElementById("sa-game").value = a.game || "lien-quan";
+      document.getElementById("sa-title").value = a.title || "";
+      document.getElementById("sa-price").value = a.price || 0;
+      document.getElementById("sa-rank").value = a.rank || "";
+      document.getElementById("sa-cover").value = a.coverImage || "";
+      document.getElementById("sa-stats").value = (a.stats || []).join(", ");
+      document.getElementById("sa-desc").value = a.description || "";
+      document.getElementById("sa-login-user").value = creds.loginUser || "";
+      document.getElementById("sa-login-pass").value = creds.loginPass || "";
+      document.getElementById("sa-guide-note").value =
+        creds.guideNote || "Đăng nhập kiểm tra đúng skin rồi đổi mật khẩu ngay nhé!";
+      document.getElementById("sa-sold").value = String(Boolean(a.sold));
+      document.getElementById("acc-form-title").textContent = `Cập nhật & Gắn Mật Khẩu: #${a.id}`;
+      document.getElementById("acc-stock-form").hidden = false;
+      return;
+    }
+
+    const delBtn = e.target.closest(".del-acc-btn");
+    if (delBtn) {
+      await updateDoc(
+        doc(db, "shop_accounts", delBtn.dataset.id),
+        adminPayload({ deleted: true, visible: false })
+      );
+      showToast("Đã xóa Account khỏi kho.");
+      await loadAllDashboardData();
+    }
+  });
+
+  document.getElementById("acc-stock-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const id = document.getElementById("sa-id").value.trim().toUpperCase();
+    const game = document.getElementById("sa-game").value;
+    const isSold = document.getElementById("sa-sold").value === "true";
+    const cover = document.getElementById("sa-cover").value.trim();
+    const existing = shopAccounts.find((x) => x.id === id) || {};
+
+    const accDoc = {
+      ...existing,
+      id,
+      game,
+      gameLabel: game === "delta-force" ? "Delta Force" : "Liên Quân Mobile",
+      title: document.getElementById("sa-title").value.trim(),
+      price: Number(document.getElementById("sa-price").value || 0),
+      rank: document.getElementById("sa-rank").value.trim(),
+      coverImage: cover,
+      stats: document
+        .getElementById("sa-stats")
+        .value.split(",")
+        .map((s) => s.trim())
+        .filter(Boolean),
+      description: document.getElementById("sa-desc").value.trim(),
+      sold: isSold,
+      badge: isSold ? "ĐÃ BÁN" : existing.badge && existing.badge !== "ĐÃ BÁN" ? existing.badge : "VIP",
+      visible: true,
+      deleted: false
+    };
+
+    await setDoc(doc(db, "shop_accounts", id), adminPayload(accDoc), { merge: true });
+
+    const loginUser = document.getElementById("sa-login-user").value.trim();
+    const loginPass = document.getElementById("sa-login-pass").value.trim();
+    const guideNote = document.getElementById("sa-guide-note").value.trim();
+
+    if (loginUser && loginPass && vaultDocData?.publicKeyJwk) {
+      const encryptedCredentials = await encryptCustomerPii(vaultDocData.publicKeyJwk, {
+        loginUser,
+        loginPass,
+        guideNote
+      });
+      await setDoc(doc(db, "shop_vault_stock", id), adminPayload({ encryptedCredentials }));
+    }
+
+    document.getElementById("acc-stock-form").hidden = true;
+    showToast(`Đã lưu Account #${id} và két mật khẩu thành công!`);
+    await loadAllDashboardData();
+  });
+
+  // Lịch Game Cùng
   document.getElementById("filter-order-status").addEventListener("change", renderOrdersTable);
   document.getElementById("refresh-orders-btn").addEventListener("click", loadAllDashboardData);
 
@@ -517,6 +892,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     await loadAllDashboardData();
   });
 
+  // Gói Game Cùng
   document.getElementById("new-pkg-btn").addEventListener("click", () => {
     document.getElementById("pkg-form").reset();
     document.getElementById("p-id").value = "";

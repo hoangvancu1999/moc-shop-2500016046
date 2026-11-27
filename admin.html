@@ -3,20 +3,21 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Quản Trị Game Cùng Delta Force – HcuGaming Admin</title>
+  <title>Quản Trị HcuGaming – Kho Account, VietQR &amp; Game Cùng</title>
   <meta name="robots" content="noindex, nofollow" />
   <link rel="stylesheet" href="/css/game-cung.css" />
 </head>
 <body>
   <header class="tac-header">
     <div class="container tac-header-inner">
-      <a href="/game-cung" class="tac-brand">
+      <a href="/" class="tac-brand">
         <span class="tac-brand-mark">HG</span>
-        <span>Admin <span class="accent">Game Cùng</span></span>
+        <span>Admin <span class="accent">HcuGaming</span></span>
       </a>
 
       <div style="display: flex; gap: 10px; align-items: center;">
-        <a href="/game-cung" class="btn btn-outline btn-sm">← Xem trang /game-cung</a>
+        <a href="/" class="btn btn-outline btn-sm">Shop Acc</a>
+        <a href="/game-cung" class="btn btn-outline btn-sm">Game Cùng</a>
         <button type="button" id="admin-logout-btn" class="btn btn-danger btn-sm" hidden>Đăng xuất</button>
       </div>
     </div>
@@ -27,10 +28,10 @@
       <!-- Màn hình Khởi tạo / Đăng nhập Admin -->
       <section id="admin-auth-view" style="max-width: 480px; margin: 24px auto;">
         <div class="panel-card form-stack">
-          <span class="tac-kicker">BẢO MẬT QUẢN TRỊ</span>
-          <h1 id="auth-heading" style="font-size: 1.5rem;">Đăng Nhập Quản Trị Game Cùng</h1>
+          <span class="tac-kicker">BẢO MẬT QUẢN TRỊ &amp; KÉT SẮT ACC</span>
+          <h1 id="auth-heading" style="font-size: 1.5rem;">Đăng Nhập Quản Trị HcuGaming</h1>
           <p id="auth-desc" style="font-size: 0.9rem; color: var(--text-muted);">
-            Nhập mật khẩu Quản trị để mở khóa phiên chỉnh sửa và giải mã Discord ID khách hàng.
+            Nhập mật khẩu Quản trị để quản lý Kho Account, duyệt thanh toán VietQR (MB Bank 0911507170) và lịch Game Cùng.
           </p>
 
           <form id="admin-pass-form" class="form-stack">
@@ -40,7 +41,7 @@
             </div>
 
             <div id="admin-pass-confirm-wrap" class="field" hidden>
-              <label for="admin-pass-confirm">Nhập lại mật khẩu để khởi tạo khóa mã hóa lần đầu <span class="req">*</span></label>
+              <label for="admin-pass-confirm">Nhập lại mật khẩu để khởi tạo két mã hóa lần đầu <span class="req">*</span></label>
               <input type="password" id="admin-pass-confirm" placeholder="Xác nhận mật khẩu Admin" />
             </div>
 
@@ -56,43 +57,183 @@
         </div>
       </section>
 
-      <!-- Bảng điều khiển Admin sau khi đăng nhập -->
+      <!-- Bảng điều khiển Admin -->
       <section id="admin-dashboard-view" hidden>
-        <!-- KPI Thống kê doanh thu, giờ chơi, gói đặt nhiều nhất -->
         <div class="kpi-grid">
           <div class="kpi-card">
-            <div class="kpi-label">Đơn chờ xác nhận (Pending)</div>
-            <div id="kpi-pending" class="kpi-val" style="color: var(--tac-amber);">0</div>
+            <div class="kpi-label">Đơn mua Acc chờ duyệt tiền</div>
+            <div id="kpi-shop-pending" class="kpi-val" style="color: var(--tac-amber);">0</div>
           </div>
           <div class="kpi-card">
-            <div class="kpi-label">Tổng doanh thu (Paid &amp; Completed)</div>
+            <div class="kpi-label">Lịch Game Cùng chờ duyệt</div>
+            <div id="kpi-pending" class="kpi-val" style="color: var(--tac-cyan);">0</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Tổng doanh thu (Acc + Game Cùng)</div>
             <div id="kpi-revenue" class="kpi-val">0 VNĐ</div>
           </div>
           <div class="kpi-card">
-            <div class="kpi-label">Tổng số giờ chơi (Đã xác nhận/Hoàn thành)</div>
-            <div id="kpi-hours" class="kpi-val" style="color: var(--tac-cyan);">0 giờ</div>
-          </div>
-          <div class="kpi-card">
-            <div class="kpi-label">Gói được đặt nhiều nhất</div>
-            <div id="kpi-top-pkg" class="kpi-val" style="font-size: 1.05rem; color: var(--text);">Chưa có dữ liệu</div>
+            <div class="kpi-label">Tổng giờ Game Cùng / Gói Top</div>
+            <div id="kpi-hours" class="kpi-val" style="font-size: 1.05rem; color: var(--text);">0 giờ</div>
+            <div id="kpi-top-pkg" style="font-size: 0.78rem; color: var(--text-muted); margin-top: 3px;"></div>
           </div>
         </div>
 
-        <!-- Thanh chuyển Tab Quản trị -->
         <div class="admin-tabs" role="tablist">
-          <button type="button" class="admin-tab active" data-tab="tab-orders">1. Đơn đặt lịch</button>
-          <button type="button" class="admin-tab" data-tab="tab-packages">2. Gói dịch vụ &amp; Giá</button>
-          <button type="button" class="admin-tab" data-tab="tab-schedule">3. Lịch trống &amp; Bản đồ</button>
-          <button type="button" class="admin-tab" data-tab="tab-customers">4. Khách hàng</button>
-          <button type="button" class="admin-tab" data-tab="tab-reviews">5. Đánh giá</button>
+          <button type="button" class="admin-tab active" data-tab="tab-shop-orders">💳 Đơn Mua Acc (VietQR)</button>
+          <button type="button" class="admin-tab" data-tab="tab-stock">🔐 Kho Account &amp; Gắn Mật Khẩu</button>
+          <button type="button" class="admin-tab" data-tab="tab-orders">🎮 Lịch Game Cùng</button>
+          <button type="button" class="admin-tab" data-tab="tab-packages">📦 Gói Game Cùng &amp; Giá</button>
+          <button type="button" class="admin-tab" data-tab="tab-schedule">🗓️ Lịch Trống &amp; Bản Đồ</button>
+          <button type="button" class="admin-tab" data-tab="tab-customers">👥 Khách Hàng</button>
+          <button type="button" class="admin-tab" data-tab="tab-reviews">⭐ Đánh Giá</button>
         </div>
 
         <div id="admin-toast" class="alert-msg alert-success" style="margin-bottom: 16px;" hidden></div>
 
-        <!-- TAB 1: QUẢN LÝ ĐƠN ĐẶT LỊCH -->
-        <div id="tab-orders" class="admin-pane panel-card">
+        <!-- TAB MỚI 1: ĐƠN MUA ACC VIETQR & GIAO ACC 1 CHẠM -->
+        <div id="tab-shop-orders" class="admin-pane panel-card">
           <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px;">
-            <h3>Quản lý đơn đặt lịch</h3>
+            <div>
+              <h3>Đơn Mua Account qua VietQR (MB Bank 0911507170 – HOANG VAN CU)</h3>
+              <p style="font-size: 0.85rem; color: var(--text-muted);">
+                Khi thấy biến động số dư đúng Số tiền &amp; Nội dung <code>HCUxxxxxx</code>, bấm <strong>"✓ Đã nhận tiền &amp; Giao Acc"</strong> để tự động gửi TK/Mật khẩu lên màn hình khách!
+              </p>
+            </div>
+            <button type="button" id="refresh-shop-orders-btn" class="btn btn-outline btn-sm">Làm mới đơn</button>
+          </div>
+
+          <div class="table-wrap">
+            <table class="tac-table">
+              <thead>
+                <tr>
+                  <th>Mã đơn / Nội dung CK</th>
+                  <th>Khách hàng &amp; SĐT Zalo</th>
+                  <th>Sản phẩm mua</th>
+                  <th>Số tiền</th>
+                  <th>Trạng thái</th>
+                  <th>Thao tác duyệt &amp; Giao Acc</th>
+                </tr>
+              </thead>
+              <tbody id="shop-orders-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- TAB MỚI 2: KHO ACCOUNT & GẮN TÀI KHOẢN / MẬT KHẨU BẢO MẬT -->
+        <div id="tab-stock" class="admin-pane panel-card" hidden>
+          <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px;">
+            <div>
+              <h3>Kho Account Game &amp; Gắn Tài Khoản / Mật Khẩu Bàn Giao</h3>
+              <p style="font-size: 0.85rem; color: var(--text-muted);">
+                Tài khoản &amp; mật khẩu được mã hóa <strong>RSA-2048</strong> trong két bảo mật (khách bấm F12 không thể đọc trộm).
+              </p>
+            </div>
+            <button type="button" id="new-acc-btn" class="btn btn-primary btn-sm">+ Đăng Account Mới</button>
+          </div>
+
+          <form id="acc-stock-form" class="channel-box form-stack" style="margin-bottom: 20px;" hidden>
+            <h4 id="acc-form-title">Đăng / Cập nhật Account &amp; Gắn Mật Khẩu</h4>
+            <div class="form-grid-2">
+              <div class="field">
+                <label for="sa-id">Mã Account (ví dụ: LQ-001, DF-001) <span class="req">*</span></label>
+                <input type="text" id="sa-id" placeholder="LQ-002" required />
+              </div>
+              <div class="field">
+                <label for="sa-game">Tựa game <span class="req">*</span></label>
+                <select id="sa-game">
+                  <option value="lien-quan">Liên Quân Mobile</option>
+                  <option value="delta-force">Delta Force</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="form-grid-2">
+              <div class="field">
+                <label for="sa-title">Tiêu đề hiển thị trên web <span class="req">*</span></label>
+                <input type="text" id="sa-title" required />
+              </div>
+              <div class="field">
+                <label for="sa-price">Giá bán (VNĐ) <span class="req">*</span></label>
+                <input type="number" id="sa-price" min="0" step="1000" required />
+              </div>
+            </div>
+
+            <div class="form-grid-2">
+              <div class="field">
+                <label for="sa-rank">Hạng / Cấp độ</label>
+                <input type="text" id="sa-rank" placeholder="Ví dụ: Acc Reg • Lv.16 (Trắng TT)" />
+              </div>
+              <div class="field">
+                <label for="sa-cover">Đường dẫn ảnh bìa (tùy chọn)</label>
+                <input type="text" id="sa-cover" placeholder="Ví dụ: images/lq-001-skins.jpg hoặc link ảnh" />
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="sa-stats">Các tag nổi bật (phân cách bằng dấu phẩy)</label>
+              <input type="text" id="sa-stats" placeholder="Zata S-Dreamer, 29 Tướng • 20 Skin, Trắng thông tin" />
+            </div>
+
+            <div class="field">
+              <label for="sa-desc">Mô tả chi tiết bài bán Acc</label>
+              <textarea id="sa-desc" rows="2"></textarea>
+            </div>
+
+            <!-- Két gắn Tài khoản & Mật khẩu thật -->
+            <div style="border: 1px solid var(--tac-green); background: var(--tac-green-dim); border-radius: 10px; padding: 14px;" class="form-stack">
+              <strong style="color: var(--tac-green);">🔐 Két Thông Tin Đăng Nhập Bàn Giao Cho Khách (Mã hóa bảo mật)</strong>
+              <div class="form-grid-2">
+                <div class="field">
+                  <label for="sa-login-user">Tài khoản đăng nhập game (Garena / Email / Steam)</label>
+                  <input type="text" id="sa-login-user" placeholder="Nhập tài khoản bàn giao cho khách" />
+                </div>
+                <div class="field">
+                  <label for="sa-login-pass">Mật khẩu game</label>
+                  <input type="text" id="sa-login-pass" placeholder="Nhập mật khẩu bàn giao cho khách" />
+                </div>
+              </div>
+              <div class="field">
+                <label for="sa-guide-note">Hướng dẫn sau khi nhận Acc (đổi pass / bảo hành)</label>
+                <input type="text" id="sa-guide-note" value="Đăng nhập kiểm tra đúng skin rồi đổi mật khẩu ngay tại account.garena.com nhé!" />
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="sa-sold">Trạng thái bán</label>
+              <select id="sa-sold">
+                <option value="false">Đang bán (Còn hàng)</option>
+                <option value="true">ĐÃ BÁN (Khóa nút mua)</option>
+              </select>
+            </div>
+
+            <div style="display: flex; gap: 8px;">
+              <button type="submit" class="btn btn-primary btn-sm">Lưu Account &amp; Két Mật Khẩu</button>
+              <button type="button" id="cancel-acc-btn" class="btn btn-outline btn-sm">Hủy</button>
+            </div>
+          </form>
+
+          <div class="table-wrap">
+            <table class="tac-table">
+              <thead>
+                <tr>
+                  <th>Mã Acc</th>
+                  <th>Tiêu đề &amp; Game</th>
+                  <th>Giá bán</th>
+                  <th>Két TK/MK</th>
+                  <th>Trạng thái</th>
+                  <th>Thao tác</th>
+                </tr>
+              </thead>
+              <tbody id="stock-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- TAB 3: ĐƠN ĐẶT LỊCH GAME CÙNG -->
+        <div id="tab-orders" class="admin-pane panel-card" hidden>
+          <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px;">
+            <h3>Quản lý đơn đặt lịch Game Cùng</h3>
             <div style="display: flex; gap: 8px; align-items: center;">
               <select id="filter-order-status" style="background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px;">
                 <option value="all">Tất cả trạng thái</option>
@@ -125,14 +266,13 @@
           </div>
         </div>
 
-        <!-- TAB 2: QUẢN LÝ GÓI DỊCH VỤ & BẢNG GIÁ -->
+        <!-- TAB 4: GÓI GAME CÙNG & GIÁ -->
         <div id="tab-packages" class="admin-pane panel-card" hidden>
           <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px;">
-            <h3>Quản lý Gói dịch vụ &amp; Điều chỉnh giá</h3>
+            <h3>Quản lý Gói dịch vụ Game Cùng &amp; Điều chỉnh giá</h3>
             <button type="button" id="new-pkg-btn" class="btn btn-primary btn-sm">+ Thêm gói mới</button>
           </div>
 
-          <!-- Form thêm/sửa gói -->
           <form id="pkg-form" class="channel-box form-stack" style="margin-bottom: 20px;" hidden>
             <h4 id="pkg-form-title">Chỉnh sửa gói dịch vụ</h4>
             <input type="hidden" id="p-id" />
@@ -157,7 +297,7 @@
                 </select>
               </div>
               <div class="field">
-                <label for="p-price">Giá VNĐ (nhập 0 và tick "Giá Liên hệ" nếu thỏa thuận)</label>
+                <label for="p-price">Giá VNĐ</label>
                 <div style="display: flex; gap: 10px; align-items: center;">
                   <input type="number" id="p-price" min="0" step="1000" value="49000" />
                   <label style="white-space: nowrap; display: flex; gap: 5px; align-items: center;">
@@ -206,7 +346,7 @@
           </div>
         </div>
 
-        <!-- TAB 3: QUẢN LÝ LỊCH TRỐNG & BẢN ĐỒ -->
+        <!-- TAB 5: LỊCH TRỐNG & BẢN ĐỒ -->
         <div id="tab-schedule" class="admin-pane form-stack" hidden>
           <div class="panel-card form-stack">
             <h3>Cấu hình khung giờ hoạt động &amp; Khóa lịch bận</h3>
@@ -266,19 +406,19 @@
           </div>
         </div>
 
-        <!-- TAB 4: QUẢN LÝ KHÁCH HÀNG -->
+        <!-- TAB 6: KHÁCH HÀNG -->
         <div id="tab-customers" class="admin-pane panel-card" hidden>
-          <h3 style="margin-bottom: 14px;">Danh sách Khách hàng (Chỉ hiển thị trong phiên Admin)</h3>
+          <h3 style="margin-bottom: 14px;">Danh sách Khách hàng</h3>
           <div class="table-wrap">
             <table class="tac-table">
               <thead>
                 <tr>
                   <th>Họ tên / Biệt danh</th>
-                  <th>Discord ID</th>
+                  <th>Liên hệ (Discord / SĐT Zalo)</th>
                   <th>Game ID</th>
-                  <th>Số đơn đã đặt</th>
+                  <th>Số đơn</th>
                   <th>Tổng chi tiêu</th>
-                  <th>Đơn gần nhất</th>
+                  <th>Gần nhất</th>
                 </tr>
               </thead>
               <tbody id="customers-tbody"></tbody>
@@ -286,7 +426,7 @@
           </div>
         </div>
 
-        <!-- TAB 5: QUẢN LÝ ĐÁNH GIÁ -->
+        <!-- TAB 7: ĐÁNH GIÁ -->
         <div id="tab-reviews" class="admin-pane panel-card" hidden>
           <h3 style="margin-bottom: 14px;">Quản lý Đánh giá dịch vụ</h3>
           <div class="table-wrap">
@@ -309,6 +449,7 @@
     </div>
   </main>
 
+  <script src="/data.js"></script>
   <script type="module" src="/js/gc-admin.js"></script>
 </body>
 </html>
