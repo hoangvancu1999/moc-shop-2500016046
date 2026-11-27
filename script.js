@@ -113,14 +113,51 @@ function renderAccounts() {
     .join("");
 }
 
+function updateTabCounts() {
+  const lqCount = ACCOUNTS.filter((a) => a.game === "lien-quan").length;
+  const dfCount = ACCOUNTS.filter((a) => a.game === "delta-force").length;
+  const lbCount = SERVICES.filter((s) => s.group === "keo-lao-ban").length;
+  const ccCount = SERVICES.filter((s) => s.group === "choi-cung").length;
+
+  const gameLabels = {
+    all: `Tất cả (${ACCOUNTS.length})`,
+    "lien-quan": `Liên Quân Mobile (${lqCount})`,
+    "delta-force": `Delta Force (${dfCount})`
+  };
+  document.querySelectorAll(".tab-btn").forEach((btn) => {
+    if (gameLabels[btn.dataset.game]) {
+      btn.textContent = gameLabels[btn.dataset.game];
+    }
+  });
+
+  const serviceLabels = {
+    all: `Tất cả dịch vụ (${SERVICES.length})`,
+    "keo-lao-ban": `Kéo lão bản (${lbCount})`,
+    "choi-cung": `Chơi game cùng (${ccCount})`
+  };
+  document.querySelectorAll(".service-tab-btn").forEach((btn) => {
+    if (serviceLabels[btn.dataset.group]) {
+      btn.textContent = serviceLabels[btn.dataset.group];
+    }
+  });
+}
+
 // Render Dịch vụ Game
 function renderServices() {
   const gridEl = document.getElementById("service-grid");
+  const emptyEl = document.getElementById("service-empty");
   const filtered =
     activeServiceGroup === "all"
       ? SERVICES
       : SERVICES.filter((s) => s.group === activeServiceGroup);
 
+  if (filtered.length === 0) {
+    gridEl.innerHTML = "";
+    if (emptyEl) emptyEl.hidden = false;
+    return;
+  }
+
+  if (emptyEl) emptyEl.hidden = true;
   gridEl.innerHTML = filtered
     .map(
       (srv) => `
@@ -353,6 +390,11 @@ function handleOrderSubmit(e) {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  // Lọc bỏ các mục cũ trong localStorage không còn tồn tại trong danh mục
+  cart = cart.filter((c) => findCatalogItem(c.id) !== null);
+  saveCart();
+
+  updateTabCounts();
   renderAccounts();
   renderServices();
   renderCart();
