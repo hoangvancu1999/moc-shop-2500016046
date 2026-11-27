@@ -1,6 +1,4 @@
 const CART_KEY = "hcugaming_cart";
-const SERVICE_FEE = 25000;
-const FREE_FEE_THRESHOLD = 300000;
 
 let activeGame = "all";
 let activePriceRange = "all";
@@ -298,9 +296,6 @@ function renderCart() {
   const summaryEl = document.getElementById("cart-summary");
   const formEl = document.getElementById("order-form");
   const qtyEl = document.getElementById("summary-qty");
-  const subtotalEl = document.getElementById("summary-subtotal");
-  const feeEl = document.getElementById("summary-fee");
-  const hintEl = document.getElementById("fee-hint");
   const totalEl = document.getElementById("summary-total");
 
   const totalQty = cart.reduce((sum, c) => sum + c.qty, 0);
@@ -312,9 +307,6 @@ function renderCart() {
     summaryEl.hidden = true;
     formEl.hidden = true;
     qtyEl.textContent = "0";
-    subtotalEl.textContent = "0đ";
-    feeEl.textContent = "0đ";
-    hintEl.textContent = "";
     totalEl.textContent = "0đ";
     return;
   }
@@ -323,14 +315,14 @@ function renderCart() {
   summaryEl.hidden = false;
   formEl.hidden = false;
 
-  let subtotal = 0;
+  let grandTotal = 0;
 
   itemsEl.innerHTML = cart
     .map((entry) => {
       const item = findCatalogItem(entry.id);
       if (!item) return "";
       const lineTotal = item.price * entry.qty;
-      subtotal += lineTotal;
+      grandTotal += lineTotal;
 
       return `
         <li class="cart-item">
@@ -353,16 +345,7 @@ function renderCart() {
     })
     .join("");
 
-  const fee = subtotal >= FREE_FEE_THRESHOLD ? 0 : SERVICE_FEE;
-  const grandTotal = subtotal + fee;
-
   qtyEl.textContent = totalQty;
-  subtotalEl.textContent = formatVND(subtotal);
-  feeEl.textContent = fee === 0 ? "Miễn phí (0đ)" : formatVND(fee);
-  hintEl.textContent =
-    fee === 0
-      ? "🎉 Đơn từ 300.000đ được miễn phí phí giao dịch trung gian!"
-      : `Đơn dưới 300.000đ có phí giao dịch trung gian ${formatVND(SERVICE_FEE)} (thêm ${formatVND(FREE_FEE_THRESHOLD - subtotal)} để miễn phí).`;
   totalEl.textContent = formatVND(grandTotal);
 }
 
