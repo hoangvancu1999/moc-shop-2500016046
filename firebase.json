@@ -2,5 +2,25 @@
   "firestore": {
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
+  },
+  "hosting": {
+    "site": "hcugaming",
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      "firestore.rules",
+      "firestore.indexes.json",
+      "vercel.json",
+      ".vercelignore",
+      "server.js",
+      "*.log",
+      ".env*",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      { "source": "/game-cung", "destination": "/game-cung.html" },
+      { "source": "/admin", "destination": "/admin.html" }
+    ]
   }
 }
